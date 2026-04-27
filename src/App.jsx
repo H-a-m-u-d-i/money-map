@@ -1,12 +1,17 @@
 import React, { useEffect, useRef } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, PlusCircle, PieChart, Activity } from 'lucide-react';
+import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Wallet, PieChart, Activity } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
 import NewTransaction from './pages/NewTransaction';
 import Insights from './pages/Insights';
 import CategoryManager from './pages/CategoryManager';
 import Loans from './pages/Loans';
+
+// Main tab routes — these replace history so they never stack
+const MAIN_TABS = ['/', '/wallets', '/loans', '/insights'];
+// Sub-pages — pressing back on these goes to home
+const SUB_PAGES = ['/new', '/settings/categories'];
 
 const BottomNav = () => {
   const location = useLocation();
@@ -28,8 +33,9 @@ const BottomNav = () => {
       paddingBottom: 'env(safe-area-inset-bottom)',
       zIndex: 1000
     }}>
-      <NavItem to="/" icon={<Home size={24} />} active={location.pathname === '/'} label="Home" />
-      <NavItem to="/wallets" icon={<Wallet size={24} />} active={location.pathname === '/wallets'} label="Wallets" />
+      {/* All tab links use 'replace' so they never push to browser history stack */}
+      <NavItem to="/" replace icon={<Home size={24} />} active={location.pathname === '/'} label="Home" />
+      <NavItem to="/wallets" replace icon={<Wallet size={24} />} active={location.pathname === '/wallets'} label="Wallets" />
       
       {/* Split Entry Buttons */}
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', transform: 'translateY(-10px)' }}>
@@ -67,14 +73,14 @@ const BottomNav = () => {
         </Link>
       </div>
       
-      <NavItem to="/loans" icon={<Activity size={24} />} active={location.pathname === '/loans'} label="Loans" />
-      <NavItem to="/insights" icon={<PieChart size={24} />} active={location.pathname === '/insights'} label="Stats" />
+      <NavItem to="/loans" replace icon={<Activity size={24} />} active={location.pathname === '/loans'} label="Loans" />
+      <NavItem to="/insights" replace icon={<PieChart size={24} />} active={location.pathname === '/insights'} label="Stats" />
     </div>
   );
 };
 
-const NavItem = ({ to, icon, active, label, style }) => (
-  <Link to={to} style={{
+const NavItem = ({ to, replace, icon, active, label }) => (
+  <Link to={to} replace={replace} style={{
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -84,35 +90,38 @@ const NavItem = ({ to, icon, active, label, style }) => (
     fontSize: '12px',
     fontWeight: active ? '600' : '400',
     transition: 'all 0.2s ease',
-    ...style
   }}>
     {icon}
     <span>{label}</span>
   </Link>
 );
 
-function App() {
-  const [showExitConfirm, setShowExitConfirm] = React.useState(false);
+// Separate component so it has access to useLocation and useNavigate inside the Router
+function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const exitTimeout = useRef(null);
 
   useEffect(() => {
-    // Capacitor Android back button handler
     let listener;
     const setupBackButton = async () => {
       try {
         const { App: CapApp } = await import('@capacitor/app');
-        listener = await CapApp.addListener('backButton', ({ canGoBack }) => {
-          if (!canGoBack) {
-            // We're at root — show exit confirmation
+        listener = await CapApp.addListener('backButton', () => {
+          const path = location.pathname;
+          
+          if (MAIN_TABS.includes(path)) {
+            // On a main tab → show exit confirmation
             setShowExitConfirm(true);
             if (exitTimeout.current) clearTimeout(exitTimeout.current);
             exitTimeout.current = setTimeout(() => setShowExitConfirm(false), 3000);
           } else {
-            window.history.back();
+            // On a sub-page → go home (replace so it doesn't stack)
+            navigate('/', { replace: true });
           }
         });
       } catch (e) {
-        // Not running in Capacitor, skip
+        // Not running in Capacitor — skip
       }
     };
     setupBackButton();
@@ -120,7 +129,55 @@ function App() {
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
-  }, []);
+  }, [location.pathname, navigate, setShowExitConfirm]);
+
+  return (
+    <div className="app-container">
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/wallets" element={<Wallets />} />
+        <Route path="/new" element={<NewTransaction />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="/settings/categories" element={<CategoryManager />} />
+        <Route path="/loans" element={<Loans />} />
+      </Routes>
+      <BottomNav />
+
+      {/* Exit Confirmation Toast */}
+      {showExitConfirm && (
+        <div style={{
+          position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(30,30,36,0.97)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '16px', padding: '16px 24px', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          animation: 'slideUp 0.2s ease',
+          whiteSpace: 'nowrap'
+        }}>
+          <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
+            Exit Money Map?
+          </span>
+          <button
+            onClick={() => setShowExitConfirm(false)}
+            style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
+          >
+            Stay
+          </button>
+          <button
+            onClick={handleExit}
+            style={{ background: 'var(--accent-danger)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+          >
+            Exit
+          </button>
+        </div>
+      )}
+      <style>{`@keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }`}</style>
+    </div>
+  );
+}
+
+function App() {
+  const [showExitConfirm, setShowExitConfirm] = React.useState(false);
 
   const handleExit = async () => {
     try {
@@ -133,47 +190,11 @@ function App() {
 
   return (
     <Router>
-      <div className="app-container">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/wallets" element={<Wallets />} />
-          <Route path="/new" element={<NewTransaction />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/settings/categories" element={<CategoryManager />} />
-          <Route path="/loans" element={<Loans />} />
-        </Routes>
-        <BottomNav />
-
-        {/* Exit Confirmation Toast */}
-        {showExitConfirm && (
-          <div style={{
-            position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(30,30,36,0.97)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '16px', padding: '16px 24px', zIndex: 9999,
-            display: 'flex', alignItems: 'center', gap: '16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            animation: 'slideUp 0.2s ease',
-            whiteSpace: 'nowrap'
-          }}>
-            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
-              Exit Money Map?
-            </span>
-            <button
-              onClick={() => setShowExitConfirm(false)}
-              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
-            >
-              Stay
-            </button>
-            <button
-              onClick={handleExit}
-              style={{ background: 'var(--accent-danger)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
-            >
-              Exit
-            </button>
-          </div>
-        )}
-        <style>{`@keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }`}</style>
-      </div>
+      <AppInner
+        showExitConfirm={showExitConfirm}
+        setShowExitConfirm={setShowExitConfirm}
+        handleExit={handleExit}
+      />
     </Router>
   );
 }
