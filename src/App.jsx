@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home, Wallet, PlusCircle, PieChart, Activity } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
@@ -92,6 +92,45 @@ const NavItem = ({ to, icon, active, label, style }) => (
 );
 
 function App() {
+  const [showExitConfirm, setShowExitConfirm] = React.useState(false);
+  const exitTimeout = useRef(null);
+
+  useEffect(() => {
+    // Capacitor Android back button handler
+    let listener;
+    const setupBackButton = async () => {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        listener = await CapApp.addListener('backButton', ({ canGoBack }) => {
+          if (!canGoBack) {
+            // We're at root — show exit confirmation
+            setShowExitConfirm(true);
+            if (exitTimeout.current) clearTimeout(exitTimeout.current);
+            exitTimeout.current = setTimeout(() => setShowExitConfirm(false), 3000);
+          } else {
+            window.history.back();
+          }
+        });
+      } catch (e) {
+        // Not running in Capacitor, skip
+      }
+    };
+    setupBackButton();
+    return () => {
+      if (listener) listener.remove();
+      if (exitTimeout.current) clearTimeout(exitTimeout.current);
+    };
+  }, []);
+
+  const handleExit = async () => {
+    try {
+      const { App: CapApp } = await import('@capacitor/app');
+      await CapApp.exitApp();
+    } catch (e) {
+      window.close();
+    }
+  };
+
   return (
     <Router>
       <div className="app-container">
@@ -104,6 +143,36 @@ function App() {
           <Route path="/loans" element={<Loans />} />
         </Routes>
         <BottomNav />
+
+        {/* Exit Confirmation Toast */}
+        {showExitConfirm && (
+          <div style={{
+            position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(30,30,36,0.97)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '16px', padding: '16px 24px', zIndex: 9999,
+            display: 'flex', alignItems: 'center', gap: '16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            animation: 'slideUp 0.2s ease',
+            whiteSpace: 'nowrap'
+          }}>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
+              Exit Money Map?
+            </span>
+            <button
+              onClick={() => setShowExitConfirm(false)}
+              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
+            >
+              Stay
+            </button>
+            <button
+              onClick={handleExit}
+              style={{ background: 'var(--accent-danger)', border: 'none', borderRadius: '10px', padding: '8px 16px', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+            >
+              Exit
+            </button>
+          </div>
+        )}
+        <style>{`@keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }`}</style>
       </div>
     </Router>
   );

@@ -235,7 +235,7 @@ export default function NewTransaction() {
                   }}
                 >
                   <div style={{ color: cat.color }}><Icon size={28} /></div>
-                  <span style={{ fontSize: '12px', fontWeight: '600' }}>{cat.name}</span>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{cat.name}</span>
                 </button>
               );
             })}
