@@ -68,8 +68,12 @@ export default function NewTransaction() {
         handleSubmit(categoryId, cashAcc.id);
         return;
       }
-      if (type === 'income' && !toAccountId) {
-        alert("Please select a deposit account.");
+      if (type === 'income') {
+        if (!toAccountId) {
+          alert("Please select a deposit account.");
+          return;
+        }
+        handleSubmit();
         return;
       }
     }
