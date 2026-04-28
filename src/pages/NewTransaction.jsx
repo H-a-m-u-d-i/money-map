@@ -40,6 +40,17 @@ export default function NewTransaction() {
   const [categoryId, setCategoryId] = useState(existingTxn?.categoryId || '');
   const [showCalculator, setShowCalculator] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(null); // 'from' or 'to'
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    const handleClickAway = (e) => {
+      if (!e.target.closest('.input-group')) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('click', handleClickAway);
+    return () => document.removeEventListener('click', handleClickAway);
+  }, []);
 
   useEffect(() => {
     if (mode && !editId) setType(mode);
@@ -163,7 +174,7 @@ export default function NewTransaction() {
             </div>
           </div>
 
-          <div className="input-group">
+          <div className="input-group" style={{ position: 'relative' }}>
             <label className="input-label">Note</label>
             <input 
               type="text" 
@@ -172,7 +183,32 @@ export default function NewTransaction() {
               value={note}
               onChange={e => setNote(e.target.value)}
               style={{ textAlign: 'center', fontSize: '16px' }}
+              onFocus={() => setShowSuggestions(true)}
             />
+            {showSuggestions && note.trim().length > 0 && (
+              <div className="glass-panel" style={{ 
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, 
+                maxHeight: '150px', overflowY: 'auto', marginTop: '4px',
+                padding: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+              }}>
+                {[...new Set(transactions.map(t => t.note))]
+                  .filter(n => n.toLowerCase().includes(note.toLowerCase()) && n.toLowerCase() !== note.toLowerCase())
+                  .slice(0, 5)
+                  .map((suggestion, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => { setNote(suggestion); setShowSuggestions(false); }}
+                      style={{ 
+                        padding: '10px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        fontSize: '14px', color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {suggestion}
+                    </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
 
           {(type === 'transfer' || type === 'withdrawal' || type === 'expense') && (
