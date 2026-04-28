@@ -324,13 +324,6 @@ export default function Dashboard() {
       
       {/* Quick Actions Row */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
-        <button onClick={() => useStore.getState().exportToCSV()} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
-          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
-            <Activity size={16} />
-          </div>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Export CSV</span>
-        </button>
-
         <button onClick={() => navigate('/recurring')} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
           <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
             <Repeat size={16} />

@@ -202,21 +202,75 @@ const useStore = create(
         const loanToDelete = state.loans.find(l => l.id === id);
         if (!loanToDelete) return state;
 
-        // Calculate how much has been paid back already
-        const paidSoFar = (loanToDelete.payments || []).reduce((sum, p) => sum + p.amount, 0);
-        const remainingAmount = loanToDelete.amount - paidSoFar;
+        // Only reverse the UNPAID portion if the loan is NOT fully paid.
+        // If it's already paid, we just remove the record from history without touching wallets.
+        let updatedAccounts = state.accounts;
+        if (loanToDelete.status !== 'paid') {
+          const paidAmount = (loanToDelete.payments || []).reduce((sum, p) => sum + p.amount, 0);
+          const remainingAmount = Math.max(0, loanToDelete.amount - paidAmount);
 
-        // Only reverse the unpaid portion on the original account
+          if (remainingAmount > 0) {
+            updatedAccounts = state.accounts.map(acc => {
+              if (acc.id === loanToDelete.accountId) {
+                if (loanToDelete.type === 'given') return { ...acc, balance: acc.balance + remainingAmount };
+                if (loanToDelete.type === 'received') return { ...acc, balance: acc.balance - remainingAmount };
+              }
+              return acc;
+            });
+          }
+        }
+
+        return {
+          loans: state.loans.filter(l => l.id !== id),
+          accounts: updatedAccounts
+        };
+      }),
+
+      deleteLoanPayment: (loanId, paymentIndex) => set((state) => {
+        const loan = state.loans.find(l => l.id === loanId);
+        if (!loan || !loan.payments || !loan.payments[paymentIndex]) return state;
+
+        const paymentToDelete = loan.payments[paymentIndex];
+        
+        // Reverse the wallet impact of this specific payment
         const updatedAccounts = state.accounts.map(acc => {
-          if (acc.id === loanToDelete.accountId && remainingAmount > 0) {
-            if (loanToDelete.type === 'given') return { ...acc, balance: acc.balance + remainingAmount };
-            if (loanToDelete.type === 'received') return { ...acc, balance: acc.balance - remainingAmount };
+          if (acc.id === paymentToDelete.accountId) {
+            // Lent (given): original payment added money to wallet -> now subtract it back
+            // Borrowed (received): original payment subtracted from wallet -> now add it back
+            return { ...acc, balance: loan.type === 'given' ? acc.balance - paymentToDelete.amount : acc.balance + paymentToDelete.amount };
           }
           return acc;
         });
 
+        const updatedPayments = loan.payments.filter((_, i) => i !== paymentIndex);
+        const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+        const newStatus = totalPaid >= loan.amount ? 'paid' : totalPaid > 0 ? 'partial' : 'active';
         return {
-          loans: state.loans.filter(l => l.id !== id),
+          loans: state.loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments, status: newStatus } : l),
+          accounts: updatedAccounts
+        };
+      }),
+
+      updateLoanPayment: (loanId, paymentIndex, newAmount) => set((state) => {
+        const loan = state.loans.find(l => l.id === loanId);
+        if (!loan || !loan.payments || !loan.payments[paymentIndex]) return state;
+
+        const oldPayment = loan.payments[paymentIndex];
+        const diff = newAmount - oldPayment.amount;
+        
+        const updatedAccounts = state.accounts.map(acc => {
+          if (acc.id === oldPayment.accountId) {
+            return { ...acc, balance: loan.type === 'given' ? acc.balance + diff : acc.balance - diff };
+          }
+          return acc;
+        });
+
+        const updatedPayments = loan.payments.map((p, i) => i === paymentIndex ? { ...p, amount: newAmount } : p);
+        const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+        const newStatus = totalPaid >= loan.amount ? 'paid' : totalPaid > 0 ? 'partial' : 'active';
+
+        return {
+          loans: state.loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments, status: newStatus } : l),
           accounts: updatedAccounts
         };
       }),
@@ -310,31 +364,6 @@ const useStore = create(
             accounts: updatedAccounts
           });
         }
-      },
-
-      exportToCSV: () => {
-        const txns = get().transactions;
-        const accounts = get().accounts;
-        const categories = get().categories;
-
-        const headers = ["Date", "Type", "Amount", "Account From", "Account To", "Category", "Note"];
-        const rows = txns.map(t => [
-          new Date(t.date).toLocaleDateString(),
-          t.type,
-          t.amount,
-          accounts.find(a => a.id === t.fromAccountId)?.name || "",
-          accounts.find(a => a.id === t.toAccountId)?.name || "",
-          categories.find(c => c.id === t.categoryId)?.name || "",
-          t.note
-        ]);
-
-        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `money_map_export_${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
       },
 
       // Backup & Restore

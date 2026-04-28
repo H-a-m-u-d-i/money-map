@@ -161,6 +161,8 @@ export default function Loans() {
   const editLoan = useStore(state => state.editLoan);
   const deleteLoan = useStore(state => state.deleteLoan);
   const recordLoanPayment = useStore(state => state.recordLoanPayment);
+  const deleteLoanPayment = useStore(state => state.deleteLoanPayment);
+  const updateLoanPayment = useStore(state => state.updateLoanPayment);
 
   // Add/Edit form state
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
@@ -329,8 +331,25 @@ export default function Loans() {
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
                     <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Payment History</p>
                     {loan.payments.map((p, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < loan.payments.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{new Date(p.date).toLocaleDateString()}</span>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < loan.payments.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button 
+                            onClick={() => { if(window.confirm('Delete this payment? Balance will be reversed.')) deleteLoanPayment(loan.id, i); }} 
+                            style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.4)', padding: '4px' }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const newAmt = prompt('New payment amount:', p.amount);
+                              if (newAmt && !isNaN(newAmt)) updateLoanPayment(loan.id, i, parseFloat(newAmt));
+                            }} 
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', opacity: 0.4, padding: '4px' }}
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{new Date(p.date).toLocaleDateString()}</span>
+                        </div>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent-success)' }}>${p.amount.toLocaleString()}</span>
                       </div>
                     ))}
