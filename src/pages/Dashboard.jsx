@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { Wallet, PlusCircle, Home, PieChart, Activity, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings } from 'lucide-react';
+import { Wallet, PlusCircle, Home, PieChart, Activity, Repeat, ShieldCheck, ArrowRight, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -321,37 +321,63 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      
+      {/* Quick Actions Row */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
+        <button onClick={() => useStore.getState().exportToCSV()} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+            <Activity size={16} />
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Export CSV</span>
+        </button>
 
-      {/* Spending Velocity Meter */}
-      <div className="glass-panel" style={{ 
-        padding: '16px', 
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        border: '1px solid var(--border-color)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={() => navigate('/recurring')} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+            <Repeat size={16} />
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Recurring</span>
+        </button>
+
+        <button onClick={() => navigate('/settings/categories')} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+            <PieChart size={16} />
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Categories</span>
+        </button>
+      </div>
+
+      {/* Financial Health Widget */}
+      <div 
+        onClick={() => navigate('/health')}
+        className="glass-panel" 
+        style={{ 
+          padding: '20px', 
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          border: '1px solid rgba(255,255,255,0.05)',
+          background: 'linear-gradient(to right, rgba(99,102,241,0.05), rgba(0,0,0,0))',
+          cursor: 'pointer'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ 
-            width: '40px', height: '40px', borderRadius: '50%', 
-            background: speedRatio > 1.2 ? 'rgba(239, 68, 68, 0.1)' : speedRatio < 0.8 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)',
+            width: '48px', height: '48px', borderRadius: '14px', 
+            background: 'rgba(99, 102, 241, 0.1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: speedRatio > 1.2 ? 'var(--accent-danger)' : speedRatio < 0.8 ? 'var(--accent-success)' : 'var(--accent-primary)'
+            color: 'var(--accent-primary)'
           }}>
-            <Activity size={20} />
+            <ShieldCheck size={24} />
           </div>
           <div>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Spending Speed</p>
-            <h4 style={{ fontSize: '15px', fontWeight: '700' }}>
-              {speedRatio > 1.2 ? 'Speeding' : speedRatio < 0.8 ? 'Parked' : 'Cruising'}
-            </h4>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Financial Health</p>
+            <h4 style={{ fontSize: '16px', fontWeight: '800' }}>Check Your Score</h4>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '16px', fontWeight: '800' }}>${velocity.current.toFixed(0)}<span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '400' }}> / day</span></p>
-          <p style={{ fontSize: '10px', color: speedRatio > 1 ? 'var(--accent-danger)' : 'var(--accent-success)' }}>
-            {speedRatio > 1 ? '+' : ''}{((speedRatio - 1) * 100).toFixed(0)}% vs normal
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600' }}>Insights</span>
+          <ArrowRight size={16} />
         </div>
       </div>
 

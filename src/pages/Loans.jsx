@@ -1,9 +1,157 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { ChevronLeft, Plus, Trash2, CheckCircle, User, ArrowUpRight, ArrowDownRight, Calculator, ChevronRight, Edit2, ChevronDown, X } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, CheckCircle, ArrowUpRight, ArrowDownRight, ChevronRight, Edit2, ChevronDown, X } from 'lucide-react';
 import NumericInputer from '../components/NumericInputer';
 import AccountSelector from '../components/AccountSelector';
+
+// --- Sub-components moved OUTSIDE to prevent focus loss ---
+
+const FormModal = ({ modal, setModal, person, setPerson, amount, setAmount, type, setType, accountId, setAccountId, note, setNote, accounts, setShowCalculator, setSelectorOpen, handleSave }) => (
+  <div style={{
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+  }}>
+    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+      <div className="flex-between" style={{ marginBottom: '20px' }}>
+        <h3 style={{ fontWeight: '800', fontSize: '18px' }}>{modal === 'add' ? 'New Loan Record' : 'Edit Loan'}</h3>
+        <button onClick={() => setModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <X size={22} />
+        </button>
+      </div>
+
+      {modal === 'add' && (
+        <div className="input-group">
+          <label className="input-label">Type</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="btn"
+              style={{ flex: 1, background: type === 'received' ? 'rgba(239,68,68,0.2)' : 'var(--bg-surface)', border: type === 'received' ? '1px solid var(--accent-danger)' : 'none', color: type === 'received' ? 'var(--accent-danger)' : 'var(--text-secondary)', fontWeight: '700' }}
+              onClick={() => setType('received')}
+            >
+              ↓ Borrowed
+            </button>
+            <button
+              className="btn"
+              style={{ flex: 1, background: type === 'given' ? 'rgba(16,185,129,0.2)' : 'var(--bg-surface)', border: type === 'given' ? '1px solid var(--accent-success)' : 'none', color: type === 'given' ? 'var(--accent-success)' : 'var(--text-secondary)', fontWeight: '700' }}
+              onClick={() => setType('given')}
+            >
+              ↑ Lent Out
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="input-group">
+        <label className="input-label">{type === 'received' ? 'Borrowed from' : 'Lent to'}</label>
+        <input type="text" className="input-field" placeholder="Person's name" value={person} onChange={e => setPerson(e.target.value)} />
+      </div>
+
+      {modal === 'add' && (
+        <>
+          <div className="input-group">
+            <label className="input-label">Amount</label>
+            <div
+              onClick={() => setShowCalculator(true)}
+              className="input-field"
+              style={{ fontSize: '28px', fontWeight: '800', textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: type === 'received' ? 'var(--accent-danger)' : 'var(--accent-success)' }}
+            >
+              {amount || '0.00'}
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">{type === 'received' ? 'Add to Account (money received)' : 'Deduct from Account (money given)'}</label>
+            <button
+              type="button" className="input-field"
+              style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => setSelectorOpen('loan')}
+            >
+              <span>{accounts.find(a => a.id === accountId)?.name || 'Select Account'}</span>
+              <ChevronRight size={18} color="var(--text-secondary)" />
+            </button>
+          </div>
+        </>
+      )}
+
+      <div className="input-group">
+        <label className="input-label">Note (optional)</label>
+        <input type="text" className="input-field" placeholder="What for?" value={note} onChange={e => setNote(e.target.value)} />
+      </div>
+
+      <button
+        className="btn btn-primary"
+        style={{ width: '100%', marginTop: '8px', padding: '16px', borderRadius: '14px', background: type === 'received' ? 'var(--accent-danger)' : 'var(--accent-success)' }}
+        onClick={handleSave}
+      >
+        {modal === 'add' ? 'Create Loan Record' : 'Save Changes'}
+      </button>
+    </div>
+  </div>
+);
+
+const PayModal = ({ payModal, setPayModal, payAmount, setPayAmount, payAccountId, setPayAccountId, remaining, accounts, setShowPayCalculator, setSelectorOpen, handleRecordPayment }) => (
+  <div style={{
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+  }}>
+    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+      <div className="flex-between" style={{ marginBottom: '8px' }}>
+        <h3 style={{ fontWeight: '800', fontSize: '18px' }}>Record Payment</h3>
+        <button onClick={() => setPayModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <X size={22} />
+        </button>
+      </div>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
+        {payModal.type === 'given' ? `${payModal.person} is paying you back` : `You are paying back ${payModal.person}`} • Remaining: <span style={{ color: 'var(--accent-warning)', fontWeight: '700' }}>${remaining.toLocaleString()}</span>
+      </p>
+
+      <div className="input-group">
+        <label className="input-label">Amount to Pay Now</label>
+        <div
+          onClick={() => setShowPayCalculator(true)}
+          className="input-field"
+          style={{ fontSize: '28px', fontWeight: '800', textAlign: 'center', cursor: 'pointer', color: payModal.type === 'given' ? 'var(--accent-success)' : 'var(--accent-danger)' }}
+        >
+          {payAmount || '0.00'}
+        </div>
+      </div>
+
+      <div className="input-group">
+        <label className="input-label">Account</label>
+        <button
+          type="button" className="input-field"
+          style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          onClick={() => setSelectorOpen('pay')}
+        >
+          <span>{accounts.find(a => a.id === payAccountId)?.name || 'Select Account'}</span>
+          <ChevronRight size={18} color="var(--text-secondary)" />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          className="btn"
+          style={{ flex: 1, padding: '14px', background: 'var(--bg-surface)' }}
+          onClick={() => { setPayAmount(remaining.toString()); }}
+        >
+          Pay Full (${remaining.toLocaleString()})
+        </button>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1, padding: '14px', background: payModal.type === 'given' ? 'var(--accent-success)' : 'var(--accent-danger)' }}
+          onClick={handleRecordPayment}
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// --- Main Component ---
 
 export default function Loans() {
   const navigate = useNavigate();
@@ -60,7 +208,6 @@ export default function Loans() {
       addLoan({ person: person.trim(), amount: parseFloat(amount), type, accountId, note: note.trim(), date: new Date().toISOString() });
     } else {
       editLoan(editingId, { person: person.trim(), note: note.trim() });
-      // Note: only allow editing person/note, not amount/type/account after creation
     }
     setModal(null);
   };
@@ -68,7 +215,7 @@ export default function Loans() {
   const openPayModal = (loan) => {
     const remaining = getRemainingAmount(loan);
     setPayAmount(remaining.toString());
-    setPayAccountId(loan.accountId); // auto-fill with original account
+    setPayAccountId(loan.accountId); 
     setPayModal(loan);
   };
 
@@ -86,155 +233,8 @@ export default function Loans() {
   };
 
   const activeLoans = loans.filter(l => l.status !== 'paid');
-  const paidLoans = loans.filter(l => l.status === 'paid');
-
-  const FormModal = () => (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-      zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-    }}>
-      <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-        <div className="flex-between" style={{ marginBottom: '20px' }}>
-          <h3 style={{ fontWeight: '800', fontSize: '18px' }}>{modal === 'add' ? 'New Loan Record' : 'Edit Loan'}</h3>
-          <button onClick={() => setModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <X size={22} />
-          </button>
-        </div>
-
-        {modal === 'add' && (
-          <div className="input-group">
-            <label className="input-label">Type</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className="btn"
-                style={{ flex: 1, background: type === 'received' ? 'rgba(239,68,68,0.2)' : 'var(--bg-surface)', border: type === 'received' ? '1px solid var(--accent-danger)' : 'none', color: type === 'received' ? 'var(--accent-danger)' : 'var(--text-secondary)', fontWeight: '700' }}
-                onClick={() => setType('received')}
-              >
-                ↓ Borrowed
-              </button>
-              <button
-                className="btn"
-                style={{ flex: 1, background: type === 'given' ? 'rgba(16,185,129,0.2)' : 'var(--bg-surface)', border: type === 'given' ? '1px solid var(--accent-success)' : 'none', color: type === 'given' ? 'var(--accent-success)' : 'var(--text-secondary)', fontWeight: '700' }}
-                onClick={() => setType('given')}
-              >
-                ↑ Lent Out
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="input-group">
-          <label className="input-label">{type === 'received' ? 'Borrowed from' : 'Lent to'}</label>
-          <input type="text" className="input-field" placeholder="Person's name" value={person} onChange={e => setPerson(e.target.value)} />
-        </div>
-
-        {modal === 'add' && (
-          <>
-            <div className="input-group">
-              <label className="input-label">Amount</label>
-              <div
-                onClick={() => setShowCalculator(true)}
-                className="input-field"
-                style={{ fontSize: '28px', fontWeight: '800', textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: type === 'received' ? 'var(--accent-danger)' : 'var(--accent-success)' }}
-              >
-                {amount || '0.00'}
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label className="input-label">{type === 'received' ? 'Add to Account (money received)' : 'Deduct from Account (money given)'}</label>
-              <button
-                type="button" className="input-field"
-                style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                onClick={() => setSelectorOpen('loan')}
-              >
-                <span>{accounts.find(a => a.id === accountId)?.name || 'Select Account'}</span>
-                <ChevronRight size={18} color="var(--text-secondary)" />
-              </button>
-            </div>
-          </>
-        )}
-
-        <div className="input-group">
-          <label className="input-label">Note (optional)</label>
-          <input type="text" className="input-field" placeholder="What for?" value={note} onChange={e => setNote(e.target.value)} />
-        </div>
-
-        <button
-          className="btn btn-primary"
-          style={{ width: '100%', marginTop: '8px', padding: '16px', borderRadius: '14px', background: type === 'received' ? 'var(--accent-danger)' : 'var(--accent-success)' }}
-          onClick={handleSave}
-        >
-          {modal === 'add' ? 'Create Loan Record' : 'Save Changes'}
-        </button>
-      </div>
-    </div>
-  );
-
-  const PayModal = () => {
-    if (!payModal) return null;
-    const remaining = getRemainingAmount(payModal);
-    return (
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-        zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-      }}>
-        <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-          <div className="flex-between" style={{ marginBottom: '8px' }}>
-            <h3 style={{ fontWeight: '800', fontSize: '18px' }}>Record Payment</h3>
-            <button onClick={() => setPayModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-              <X size={22} />
-            </button>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
-            {payModal.type === 'given' ? `${payModal.person} is paying you back` : `You are paying back ${payModal.person}`} • Remaining: <span style={{ color: 'var(--accent-warning)', fontWeight: '700' }}>${remaining.toLocaleString()}</span>
-          </p>
-
-          <div className="input-group">
-            <label className="input-label">Amount to Pay Now</label>
-            <div
-              onClick={() => setShowPayCalculator(true)}
-              className="input-field"
-              style={{ fontSize: '28px', fontWeight: '800', textAlign: 'center', cursor: 'pointer', color: payModal.type === 'given' ? 'var(--accent-success)' : 'var(--accent-danger)' }}
-            >
-              {payAmount || '0.00'}
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Account</label>
-            <button
-              type="button" className="input-field"
-              style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              onClick={() => setSelectorOpen('pay')}
-            >
-              <span>{accounts.find(a => a.id === payAccountId)?.name || 'Select Account'}</span>
-              <ChevronRight size={18} color="var(--text-secondary)" />
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <button
-              className="btn"
-              style={{ flex: 1, padding: '14px', background: 'var(--bg-surface)' }}
-              onClick={() => { setPayAmount(remaining.toString()); }}
-            >
-              Pay Full (${remaining.toLocaleString()})
-            </button>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 1, padding: '14px', background: payModal.type === 'given' ? 'var(--accent-success)' : 'var(--accent-danger)' }}
-              onClick={handleRecordPayment}
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const paidLent = loans.filter(l => l.status === 'paid' && l.type === 'given');
+  const paidBorrowed = loans.filter(l => l.status === 'paid' && l.type === 'received');
 
   return (
     <div className="page" style={{ paddingBottom: '100px' }}>
@@ -293,7 +293,7 @@ export default function Loans() {
                     </div>
                   </div>
 
-                  {/* Progress bar for partial */}
+                  {/* Progress bar */}
                   {loan.status === 'partial' && (
                     <div style={{ marginTop: '12px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${pctPaid}%`, background: 'var(--accent-success)', borderRadius: '2px', transition: 'width 0.4s' }} />
@@ -324,7 +324,7 @@ export default function Loans() {
                   </div>
                 </div>
 
-                {/* Payment history */}
+                {/* History */}
                 {isExpanded && (loan.payments || []).length > 0 && (
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
                     <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Payment History</p>
@@ -336,46 +336,76 @@ export default function Loans() {
                     ))}
                   </div>
                 )}
-                {isExpanded && (loan.payments || []).length === 0 && (
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No payments recorded yet.</p>
-                  </div>
-                )}
               </div>
             );
           })
         )}
       </div>
 
-      {/* Paid History */}
-      {paidLoans.length > 0 && (
-        <>
-          <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Fully Settled</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {paidLoans.map(loan => (
-              <div key={loan.id} className="glass-panel" style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.65 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <CheckCircle size={18} color="var(--accent-success)" />
-                  <div>
-                    <span style={{ fontSize: '14px', fontWeight: '600' }}>{loan.person}</span>
-                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{loan.type === 'given' ? 'Returned to you' : 'You paid back'}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontWeight: '800', fontSize: '14px' }}>${loan.amount.toLocaleString()}</p>
-                  <button onClick={() => { if (window.confirm('Delete history?')) deleteLoan(loan.id); }} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', marginTop: '4px' }}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+      {/* History Sections */}
+      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Fully Settled</h3>
+      
+      {/* Settled Lent */}
+      <div style={{ marginBottom: '20px' }}>
+        <p style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(16,185,129,0.7)', textTransform: 'uppercase', marginBottom: '8px' }}>They Paid You Back (Lent)</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {paidLent.map(loan => (
+            <div key={loan.id} className="glass-panel" style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.65 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <CheckCircle size={18} color="var(--accent-success)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{loan.person}</span>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontWeight: '800', fontSize: '14px' }}>${loan.amount.toLocaleString()}</p>
+                <button onClick={() => { if (window.confirm('Delete history?')) deleteLoan(loan.id); }} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', marginTop: '4px' }}>
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {paidLent.length === 0 && <p style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', paddingLeft: '8px' }}>No history.</p>}
+        </div>
+      </div>
 
-      {/* Modals */}
-      {modal && <FormModal />}
-      {payModal && <PayModal />}
+      {/* Settled Borrowed */}
+      <div>
+        <p style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(239,68,68,0.7)', textTransform: 'uppercase', marginBottom: '8px' }}>You Paid Them Back (Borrowed)</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {paidBorrowed.map(loan => (
+            <div key={loan.id} className="glass-panel" style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.65 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <CheckCircle size={18} color="var(--accent-success)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{loan.person}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontWeight: '800', fontSize: '14px' }}>${loan.amount.toLocaleString()}</p>
+                <button onClick={() => { if (window.confirm('Delete history?')) deleteLoan(loan.id); }} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', marginTop: '4px' }}>
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {paidBorrowed.length === 0 && <p style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', paddingLeft: '8px' }}>No history.</p>}
+        </div>
+      </div>
+
+      {modal && (
+        <FormModal 
+          modal={modal} setModal={setModal} person={person} setPerson={setPerson} 
+          amount={amount} setAmount={setAmount} type={type} setType={setType} 
+          accountId={accountId} setAccountId={setAccountId} note={note} setNote={setNote} 
+          accounts={accounts} setShowCalculator={setShowCalculator} setSelectorOpen={setSelectorOpen} 
+          handleSave={handleSave} 
+        />
+      )}
+      {payModal && (
+        <PayModal 
+          payModal={payModal} setPayModal={setPayModal} payAmount={payAmount} setPayAmount={setPayAmount} 
+          payAccountId={payAccountId} setPayAccountId={setPayAccountId} remaining={getRemainingAmount(payModal)} 
+          accounts={accounts} setShowPayCalculator={setShowPayCalculator} setSelectorOpen={setSelectorOpen} 
+          handleRecordPayment={handleRecordPayment} 
+        />
+      )}
 
       {showCalculator && (
         <NumericInputer value={amount} onChange={setAmount} onDone={() => setShowCalculator(false)} />

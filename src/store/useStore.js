@@ -54,6 +54,7 @@ const useStore = create(
       currentDateView: new Date().toISOString(),
       customDateRange: { start: null, end: null },
       loans: [],
+      recurring: [],
 
       resetCategories: () => set({ categories: MONEFY_CATEGORIES }),
 
@@ -246,6 +247,95 @@ const useStore = create(
           accounts: updatedAccounts
         };
       }),
+
+      addRecurring: (rec) => set((state) => ({
+        recurring: [...state.recurring, { ...rec, id: `rec_${Date.now()}` }]
+      })),
+
+      deleteRecurring: (id) => set((state) => ({
+        recurring: state.recurring.filter(r => r.id !== id)
+      })),
+
+      processRecurring: () => {
+        const state = get();
+        const now = new Date();
+        let newTransactions = [];
+        let updatedRecurring = [...state.recurring];
+        let hasChanges = false;
+
+        updatedRecurring = updatedRecurring.map(rec => {
+          const nextDate = new Date(rec.nextDate);
+          if (now >= nextDate) {
+            hasChanges = true;
+            const newTxn = {
+              id: `txn_auto_${Date.now()}_${rec.id}`,
+              type: rec.type,
+              amount: rec.amount,
+              note: `[Auto] ${rec.note}`,
+              fromAccountId: rec.fromAccountId,
+              toAccountId: rec.toAccountId,
+              categoryId: rec.categoryId,
+              date: nextDate.toISOString(),
+              isAuto: true
+            };
+            newTransactions.push(newTxn);
+
+            const newNext = new Date(nextDate);
+            if (rec.frequency === 'daily') newNext.setDate(newNext.getDate() + 1);
+            if (rec.frequency === 'weekly') newNext.setDate(newNext.getDate() + 7);
+            if (rec.frequency === 'monthly') newNext.setMonth(newNext.getMonth() + 1);
+            
+            return { ...rec, nextDate: newNext.toISOString(), lastProcessed: now.toISOString() };
+          }
+          return rec;
+        });
+
+        if (hasChanges) {
+          let updatedAccounts = [...state.accounts];
+          newTransactions.forEach(txn => {
+            updatedAccounts = updatedAccounts.map(acc => {
+              if (txn.type === 'expense' && acc.id === txn.fromAccountId) return { ...acc, balance: acc.balance - txn.amount };
+              if (txn.type === 'income' && acc.id === txn.toAccountId) return { ...acc, balance: acc.balance + txn.amount };
+              if (txn.type === 'transfer' || txn.type === 'withdrawal') {
+                if (acc.id === txn.fromAccountId) return { ...acc, balance: acc.balance - txn.amount };
+                if (acc.id === txn.toAccountId) return { ...acc, balance: acc.balance + txn.amount };
+              }
+              return acc;
+            });
+          });
+
+          set({ 
+            transactions: [...newTransactions, ...state.transactions],
+            recurring: updatedRecurring,
+            accounts: updatedAccounts
+          });
+        }
+      },
+
+      exportToCSV: () => {
+        const txns = get().transactions;
+        const accounts = get().accounts;
+        const categories = get().categories;
+
+        const headers = ["Date", "Type", "Amount", "Account From", "Account To", "Category", "Note"];
+        const rows = txns.map(t => [
+          new Date(t.date).toLocaleDateString(),
+          t.type,
+          t.amount,
+          accounts.find(a => a.id === t.fromAccountId)?.name || "",
+          accounts.find(a => a.id === t.toAccountId)?.name || "",
+          categories.find(c => c.id === t.categoryId)?.name || "",
+          t.note
+        ]);
+
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `money_map_export_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+      },
 
       // Backup & Restore
       exportData: () => {

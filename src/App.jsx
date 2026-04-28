@@ -7,6 +7,9 @@ import NewTransaction from './pages/NewTransaction';
 import Insights from './pages/Insights';
 import CategoryManager from './pages/CategoryManager';
 import Loans from './pages/Loans';
+import RecurringManager from './pages/RecurringManager';
+import HealthScore from './pages/HealthScore';
+import useStore from './store/useStore';
 
 // Main tab routes — these replace history so they never stack
 const MAIN_TABS = ['/', '/wallets', '/loans', '/insights'];
@@ -102,7 +105,10 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const navigate = useNavigate();
   const exitTimeout = useRef(null);
 
+  const processRecurring = useStore(state => state.processRecurring);
+
   useEffect(() => {
+    processRecurring();
     let listener;
     const setupBackButton = async () => {
       try {
@@ -129,7 +135,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
-  }, [location.pathname, navigate, setShowExitConfirm]);
+  }, [location.pathname, navigate, setShowExitConfirm, processRecurring]);
 
   return (
     <div className="app-container">
@@ -140,6 +146,8 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
         <Route path="/insights" element={<Insights />} />
         <Route path="/settings/categories" element={<CategoryManager />} />
         <Route path="/loans" element={<Loans />} />
+        <Route path="/recurring" element={<RecurringManager />} />
+        <Route path="/health" element={<HealthScore />} />
       </Routes>
       <BottomNav />
 
