@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { Wallet, PlusCircle, Home, PieChart, Activity, Repeat, ShieldCheck, ArrowRight, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings } from 'lucide-react';
+import { Wallet, PlusCircle, Home, PieChart, Activity, Repeat, ShieldCheck, ArrowRight, Lock, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const currentDateView = new Date(useStore(state => state.currentDateView));
   const setViewSettings = useStore(state => state.setViewSettings);
   const customDateRange = useStore(state => state.customDateRange);
+  const biometricEnabled = useStore(state => state.biometricEnabled);
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -336,6 +337,22 @@ export default function Dashboard() {
             <PieChart size={16} />
           </div>
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Categories</span>
+        </button>
+
+        <button 
+          onClick={() => useStore.setState({ biometricEnabled: !biometricEnabled })} 
+          className="glass-panel" 
+          style={{ 
+            padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content',
+            background: biometricEnabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-surface)'
+          }}
+        >
+          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)' }}>
+            <Lock size={16} />
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+            {biometricEnabled ? 'Lock: ON' : 'Lock: OFF'}
+          </span>
         </button>
       </div>
 

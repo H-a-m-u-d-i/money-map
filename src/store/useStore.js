@@ -55,6 +55,7 @@ const useStore = create(
       customDateRange: { start: null, end: null },
       loans: [],
       recurring: [],
+      biometricEnabled: false,
 
       resetCategories: () => set({ categories: MONEFY_CATEGORIES }),
 
