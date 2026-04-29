@@ -24,6 +24,7 @@ export default function NewTransaction() {
   const categories = useStore(state => state.categories);
   const addTransaction = useStore(state => state.addTransaction);
   const editTransaction = useStore(state => state.editTransaction);
+  const resetDateView = useStore(state => state.resetDateView);
   const transactions = useStore(state => state.transactions);
 
   const queryParams = new URLSearchParams(location.search);
@@ -106,13 +107,14 @@ export default function NewTransaction() {
       date: existingTxn ? existingTxn.date : new Date().toISOString()
     };
 
-    if (existingTxn) {
+    if (editId) {
       editTransaction(editId, txnData);
     } else {
       addTransaction(txnData);
     }
 
-    navigate('/');
+    resetDateView();
+    navigate('/', { replace: true });
   };
 
   const filteredCategories = categories.filter(c => c.type === 'expense');

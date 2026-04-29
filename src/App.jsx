@@ -106,9 +106,11 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const exitTimeout = useRef(null);
 
   const processRecurring = useStore(state => state.processRecurring);
+  const resetDateView = useStore(state => state.resetDateView);
 
   useEffect(() => {
     processRecurring();
+    resetDateView();
     let listener;
     const setupBackButton = async () => {
       try {

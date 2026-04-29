@@ -59,6 +59,7 @@ const useStore = create(
       resetCategories: () => set({ categories: MONEFY_CATEGORIES }),
 
       setViewSettings: (settings) => set((state) => ({ ...state, ...settings })),
+      resetDateView: () => set({ currentDateView: new Date().toISOString() }),
 
       // Actions
       addAccount: (account) => set((state) => ({
