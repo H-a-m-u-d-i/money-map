@@ -13,12 +13,10 @@ export default function Wallets() {
   
   const [name, setName] = useState('');
   const [type, setType] = useState('bank');
-  const [balance, setBalance] = useState('');
   
   const resetForm = () => {
     setName('');
     setType('bank');
-    setBalance('');
     setShowForm(false);
     setEditId(null);
   };
@@ -27,25 +25,25 @@ export default function Wallets() {
     setEditId(acc.id);
     setName(acc.name);
     setType(acc.type);
-    setBalance(acc.balance.toString());
     setShowForm(true);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name || balance === '') return;
+    if (!name) return;
     
     const accountData = {
       name,
       type,
-      balance: parseFloat(balance) || 0,
       color: type === 'cash' ? '#10b981' : '#3b82f6'
     };
 
     if (editId) {
+      // Keep existing balance when editing name/type
       updateAccount(editId, accountData);
     } else {
-      addAccount(accountData);
+      // New wallets start at 0
+      addAccount({ ...accountData, balance: 0 });
     }
     
     resetForm();
@@ -108,20 +106,7 @@ export default function Wallets() {
             </div>
           </div>
           
-          <div className="input-group">
-            <label className="input-label">Initial Balance ($)</label>
-            <input 
-              type="number" 
-              step="0.01"
-              className="input-field" 
-              placeholder="0.00" 
-              value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              required
-            />
-          </div>
-          
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px', padding: '16px' }}>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '16px', padding: '16px' }}>
             {editId ? 'Update Wallet' : 'Create Wallet'}
           </button>
         </form>

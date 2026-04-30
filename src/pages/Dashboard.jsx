@@ -98,8 +98,10 @@ export default function Dashboard() {
   const recentTransactions = filteredTransactions
     .filter(t => t.note.toLowerCase().includes(searchQuery.toLowerCase()))
     .slice(0, 15);
-  
-  // Period-based Balance Logic
+
+  // Derived totals directly from already-filtered transactions
+  const periodIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const periodExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
   const getPeriodStats = () => {
     // 1. Find the start of the current period
     let periodStart = null;
@@ -123,7 +125,7 @@ export default function Dashboard() {
       periodEnd.setHours(23,59,59,999);
     }
 
-    if (!periodStart) return { opening: totalBalance, closing: totalBalance, change: 0 };
+    if (!periodStart) return { opening: totalBalance, closing: totalBalance, change: 0, income: 0, expense: 0 };
 
     // 2. Calculate Opening Balance (Current Balance - Sum of all net change from periodStart to NOW)
     // Actually simpler: Opening = Current Balance - (Sum of transactions from periodStart to infinity)
@@ -281,13 +283,13 @@ export default function Dashboard() {
           <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
             <p style={{ fontSize: '10px', color: 'var(--accent-success)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.5px' }}>Total Income</p>
             <p style={{ fontSize: '18px', fontWeight: '900', color: 'var(--accent-success)' }}>
-              +${periodStats.income.toLocaleString()}
+              +${periodIncome.toLocaleString()}
             </p>
           </div>
           <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
             <p style={{ fontSize: '10px', color: 'var(--accent-danger)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.5px' }}>Total Expense</p>
             <p style={{ fontSize: '18px', fontWeight: '900', color: 'var(--accent-danger)' }}>
-              -${periodStats.expense.toLocaleString()}
+              -${periodExpense.toLocaleString()}
             </p>
           </div>
         </div>
