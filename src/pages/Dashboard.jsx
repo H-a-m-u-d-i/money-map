@@ -7,6 +7,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const accounts = useStore(state => state.accounts);
   const transactions = useStore(state => state.transactions);
+  const loans = useStore(state => state.loans);
   const deleteTransaction = useStore(state => state.deleteTransaction);
 
   const categories = useStore(state => state.categories);
@@ -14,7 +15,6 @@ export default function Dashboard() {
   const currentDateView = new Date(useStore(state => state.currentDateView));
   const setViewSettings = useStore(state => state.setViewSettings);
   const customDateRange = useStore(state => state.customDateRange);
-  const biometricEnabled = useStore(state => state.biometricEnabled);
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -133,7 +133,6 @@ export default function Dashboard() {
     txnsFromStart.forEach(t => {
       if (t.type === 'income') netChangeSinceStart += t.amount;
       if (t.type === 'expense') netChangeSinceStart -= t.amount;
-      // Transfers don't change TOTAL balance, so we ignore them for the overall opening balance
     });
 
     const openingBalance = totalBalance - netChangeSinceStart;
@@ -277,16 +276,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Period Balance Comparison */}
+        {/* Period Cash Flow Summary */}
         <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px' }}>Opening</p>
-            <p style={{ fontSize: '15px', fontWeight: '800' }}>${periodStats.opening.toLocaleString()}</p>
+          <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+            <p style={{ fontSize: '10px', color: 'var(--accent-success)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.5px' }}>Total Income</p>
+            <p style={{ fontSize: '18px', fontWeight: '900', color: 'var(--accent-success)' }}>
+              +${periodStats.income.toLocaleString()}
+            </p>
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px' }}>Closing</p>
-            <p style={{ fontSize: '15px', fontWeight: '800', color: periodStats.change >= 0 ? 'var(--accent-success)' : 'var(--accent-danger)' }}>
-              ${periodStats.closing.toLocaleString()}
+          <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+            <p style={{ fontSize: '10px', color: 'var(--accent-danger)', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.5px' }}>Total Expense</p>
+            <p style={{ fontSize: '18px', fontWeight: '900', color: 'var(--accent-danger)' }}>
+              -${periodStats.expense.toLocaleString()}
             </p>
           </div>
         </div>
@@ -337,22 +338,6 @@ export default function Dashboard() {
             <PieChart size={16} />
           </div>
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Categories</span>
-        </button>
-
-        <button 
-          onClick={() => useStore.setState({ biometricEnabled: !biometricEnabled })} 
-          className="glass-panel" 
-          style={{ 
-            padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', minWidth: 'fit-content',
-            background: biometricEnabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-surface)'
-          }}
-        >
-          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)' }}>
-            <Lock size={16} />
-          </div>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-            {biometricEnabled ? 'Lock: ON' : 'Lock: OFF'}
-          </span>
         </button>
       </div>
 

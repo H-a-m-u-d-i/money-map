@@ -107,38 +107,8 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
-  const biometricEnabled = useStore(state => state.biometricEnabled);
-  
-  const [isLocked, setIsLocked] = React.useState(biometricEnabled);
-
-  const authenticate = async () => {
-    try {
-      const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
-      const result = await NativeBiometric.isAvailable();
-      
-      if (result.isAvailable) {
-        await NativeBiometric.verifyIdentity({
-          reason: "Unlock Money Map",
-          title: "Biometric Authentication",
-          subtitle: "Use fingerprint or face to unlock",
-          description: "Protect your financial data"
-        });
-        setIsLocked(false);
-      } else {
-        // Fallback if not available but somehow enabled
-        setIsLocked(false);
-      }
-    } catch (error) {
-      console.error("Auth failed", error);
-      // If user cancels, we stay locked
-    }
-  };
 
   useEffect(() => {
-    if (biometricEnabled && isLocked) {
-      authenticate();
-    }
-    
     processRecurring();
     resetDateView();
     let listener;
@@ -167,37 +137,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
-  }, [location.pathname, navigate, setShowExitConfirm, processRecurring, resetDateView, biometricEnabled]);
-
-  if (isLocked) {
-    return (
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'var(--bg-app)', zIndex: 10000,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '24px'
-      }}>
-        <div style={{ 
-          width: '80px', height: '80px', borderRadius: '24px', 
-          background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--accent-primary)', marginBottom: '24px'
-        }}>
-          <ShieldCheck size={40} />
-        </div>
-        <h2 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '8px' }}>Money Map Locked</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '48px', textAlign: 'center' }}>
-          Authentication required to access your financial data.
-        </p>
-        <button 
-          onClick={authenticate}
-          className="btn btn-primary"
-          style={{ padding: '16px 32px', borderRadius: '16px' }}
-        >
-          Unlock App
-        </button>
-      </div>
-    );
-  }
+  }, [location.pathname, navigate, setShowExitConfirm, processRecurring, resetDateView]);
 
   return (
     <div className="app-container">
