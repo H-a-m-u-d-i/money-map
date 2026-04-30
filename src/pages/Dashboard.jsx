@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { Wallet, PlusCircle, Home, PieChart, Activity, Repeat, ShieldCheck, ArrowRight, Lock, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings } from 'lucide-react';
+import { Wallet, PlusCircle, Home, PieChart, Activity, Repeat, ShieldCheck, ArrowRight, Lock, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Edit2, Trash2, Calendar, ChevronLeft, ChevronRight, ChevronDown, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home as HomeIcon, Heart, MoreHorizontal, Settings, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -15,6 +15,8 @@ export default function Dashboard() {
   const currentDateView = new Date(useStore(state => state.currentDateView));
   const setViewSettings = useStore(state => state.setViewSettings);
   const customDateRange = useStore(state => state.customDateRange);
+  const paydayDay = useStore(state => state.paydayDay);
+  const setPaydayDay = useStore(state => state.setPaydayDay);
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -102,6 +104,56 @@ export default function Dashboard() {
   // Derived totals directly from already-filtered transactions
   const periodIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const periodExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+
+  // === PAYDAY COUNTDOWN ===
+  const getPaydayInfo = () => {
+    if (!paydayDay) return null;
+    const today = new Date();
+    const todayDay = today.getDate();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    let daysUntilPayday;
+    let nextPayday;
+
+    if (todayDay < paydayDay && paydayDay <= daysInMonth) {
+      daysUntilPayday = paydayDay - todayDay;
+      nextPayday = new Date(today.getFullYear(), today.getMonth(), paydayDay);
+    } else {
+      // Next month's payday
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const daysInNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      const actualDay = Math.min(paydayDay, daysInNextMonth);
+      nextPayday = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), actualDay);
+      daysUntilPayday = Math.ceil((nextPayday - today) / (1000 * 60 * 60 * 24));
+    }
+
+    // Daily burn rate from last 7 days
+    const sevenDaysAgo = new Date(today - 7 * 24 * 60 * 60 * 1000);
+    const recentExpenses = transactions
+      .filter(t => t.type === 'expense' && new Date(t.date) >= sevenDaysAgo)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const dailyBurnRate = recentExpenses / 7;
+    const projectedRemaining = totalBalance - (dailyBurnRate * daysUntilPayday);
+    const safeDailySpend = daysUntilPayday > 0 ? totalBalance / daysUntilPayday : totalBalance;
+
+    return { daysUntilPayday, projectedRemaining, safeDailySpend, dailyBurnRate };
+  };
+  const paydayInfo = getPaydayInfo();
+
+  // === PRICE MEMORY ===
+  const getPriceMemory = (txn) => {
+    if (!txn.note || txn.note.trim().length < 3) return null;
+    const normalizedNote = txn.note.toLowerCase().trim();
+    const similar = transactions.filter(t =>
+      t.id !== txn.id &&
+      t.type === txn.type &&
+      t.note && t.note.toLowerCase().trim() === normalizedNote
+    );
+    if (similar.length < 1) return null;
+    const avg = similar.reduce((sum, t) => sum + t.amount, 0) / similar.length;
+    const diff = txn.amount - avg;
+    const pct = Math.round((diff / avg) * 100);
+    return { avg: Math.round(avg), diff: Math.round(diff), pct, count: similar.length };
+  };
   const getPeriodStats = () => {
     // 1. Find the start of the current period
     let periodStart = null;
@@ -343,6 +395,68 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Payday Countdown Card */}
+      {!paydayDay ? (
+        <button 
+          onClick={(e) => {
+            const picker = e.currentTarget.querySelector('input');
+            if (picker.showPicker) {
+              picker.showPicker();
+            } else {
+              picker.click();
+            }
+          }}
+          className="glass-panel"
+          style={{ width: '100%', marginBottom: '16px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px dashed rgba(255,255,255,0.1)', background: 'transparent', cursor: 'pointer', borderRadius: '16px', position: 'relative' }}
+        >
+          <input 
+            type="date" 
+            min={new Date().toISOString().split('T')[0]}
+            onChange={(e) => { if(e.target.value) { const date = new Date(e.target.value); setPaydayDay(date.getDate()); } }}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+          />
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', flexShrink: 0 }}>
+            <Calendar size={18} />
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Set Payday Countdown</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Tap to pick your next payday date</p>
+          </div>
+        </button>
+      ) : paydayInfo && (
+        <div className="glass-panel" style={{ marginBottom: '16px', padding: '16px', background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(0,0,0,0))', border: '1px solid rgba(245,158,11,0.12)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <div>
+              <p style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {paydayInfo.daysUntilPayday === 0 ? '🎉 Payday Today!' : `Payday in ${paydayInfo.daysUntilPayday} day${paydayInfo.daysUntilPayday > 1 ? 's' : ''}`}
+              </p>
+              <p style={{ fontSize: '22px', fontWeight: '900', marginTop: '2px' }}>
+                ${Math.max(0, paydayInfo.projectedRemaining).toLocaleString()}
+                <span style={{ fontSize: '11px', fontWeight: '500', color: 'var(--text-secondary)', marginLeft: '6px' }}>projected left</span>
+              </p>
+            </div>
+            <button onClick={() => setPaydayDay(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', opacity: 0.5, cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px' }}>
+              <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Safe Daily Spend</p>
+              <p style={{ fontSize: '16px', fontWeight: '800', color: '#f59e0b' }}>${paydayInfo.safeDailySpend.toFixed(0)}/day</p>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px' }}>
+              <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Daily Burn Rate</p>
+              <p style={{ fontSize: '16px', fontWeight: '800', color: paydayInfo.dailyBurnRate > paydayInfo.safeDailySpend ? '#ef4444' : '#10b981' }}>
+                ${paydayInfo.dailyBurnRate.toFixed(0)}/day
+              </p>
+            </div>
+          </div>
+          {paydayInfo.dailyBurnRate > paydayInfo.safeDailySpend && (
+            <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '10px', fontWeight: '600' }}>
+              ⚠️ You're burning faster than you should. Cut ${(paydayInfo.dailyBurnRate - paydayInfo.safeDailySpend).toFixed(0)}/day to stay safe.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Financial Health Widget */}
       <div 
         onClick={() => navigate('/health')}
@@ -458,6 +572,17 @@ export default function Dashboard() {
                               </div>
                               <div style={{ textAlign: 'right' }}>
                                 <p style={{ fontWeight: '700', fontSize: '14px' }}>${txn.amount.toLocaleString()}</p>
+                                {(() => {
+                                  const mem = getPriceMemory(txn);
+                                  if (!mem) return null;
+                                  const isUp = mem.diff > 0;
+                                  return (
+                                    <p style={{ fontSize: '10px', color: isUp ? '#ef4444' : '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end' }}>
+                                      {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                      {isUp ? '+' : ''}{mem.pct}% vs avg ${mem.avg}
+                                    </p>
+                                  );
+                                })()}
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '4px', opacity: 0.4 }}>
                                   <Edit2 size={12} style={{cursor: 'pointer'}} onClick={(e) => { e.stopPropagation(); navigate(`/new?edit=${txn.id}`); }} />
                                   <Trash2 size={12} style={{cursor: 'pointer'}} onClick={(e) => { e.stopPropagation(); if(window.confirm('Delete?')) deleteTransaction(txn.id); }} />

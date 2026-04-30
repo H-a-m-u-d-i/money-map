@@ -4,7 +4,7 @@ import useStore from '../store/useStore';
 import { ChevronLeft, Plus, Trash2, Calendar, Repeat, ArrowUpRight, ArrowDownRight, X, ChevronRight } from 'lucide-react';
 import AccountSelector from '../components/AccountSelector';
 
-const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, note, setNote, accountId, setAccountId, accounts, setSelectorOpen, handleAdd, onClose }) => (
+const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, startDate, setStartDate, note, setNote, accountId, setAccountId, accounts, setSelectorOpen, handleAdd, onClose }) => (
   <div style={{
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
@@ -39,13 +39,28 @@ const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, 
             <button
               key={f}
               className="btn"
-              style={{ flex: 1, background: frequency === f ? 'var(--accent-primary)' : 'var(--bg-surface)', fontSize: '12px' }}
+              style={{ flex: 1, background: frequency === f ? 'var(--accent-primary)' : 'var(--bg-surface)', fontSize: '12px', fontWeight: '700' }}
               onClick={() => setFrequency(f)}
             >
               {f.toUpperCase()}
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="input-group">
+        <label className="input-label">Start Date</label>
+        <input 
+          type="date" 
+          className="input-field" 
+          value={startDate} 
+          onChange={e => setStartDate(e.target.value)} 
+        />
+        <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+          {frequency === 'daily' && "Transaction will repeat every single day."}
+          {frequency === 'weekly' && `Transaction will repeat every ${new Date(startDate).toLocaleDateString('en-US', { weekday: 'long' })}.`}
+          {frequency === 'monthly' && `Transaction will repeat every month on the ${new Date(startDate).getDate()}${['st','nd','rd'][((new Date(startDate).getDate()+90)%100-10)%10-1]||'th'}.`}
+        </p>
       </div>
 
       <div className="input-group">
@@ -85,6 +100,7 @@ export default function RecurringManager() {
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('monthly');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -100,7 +116,7 @@ export default function RecurringManager() {
       fromAccountId: type === 'expense' ? accountId : null,
       toAccountId: type === 'income' ? accountId : null,
       categoryId: cat?.id || '',
-      nextDate: new Date().toISOString()
+      nextDate: new Date(startDate).toISOString()
     });
     setShowAdd(false);
     setAmount('');
@@ -156,7 +172,8 @@ export default function RecurringManager() {
       {showAdd && (
         <FormModal 
           type={type} setType={setType} amount={amount} setAmount={setAmount} 
-          frequency={frequency} setFrequency={setFrequency} note={note} setNote={setNote} 
+          frequency={frequency} setFrequency={setFrequency}
+          startDate={startDate} setStartDate={setStartDate} note={note} setNote={setNote} 
           accountId={accountId} setAccountId={setAccountId} accounts={accounts} 
           setSelectorOpen={setSelectorOpen} handleAdd={handleAdd} onClose={() => setShowAdd(false)}
         />

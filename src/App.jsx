@@ -9,6 +9,7 @@ import CategoryManager from './pages/CategoryManager';
 import Loans from './pages/Loans';
 import RecurringManager from './pages/RecurringManager';
 import HealthScore from './pages/HealthScore';
+import SavingsSimulator from './pages/SavingsSimulator';
 import useStore from './store/useStore';
 
 // Main tab routes — these replace history so they never stack
@@ -150,6 +151,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
         <Route path="/loans" element={<Loans />} />
         <Route path="/recurring" element={<RecurringManager />} />
         <Route path="/health" element={<HealthScore />} />
+        <Route path="/savings-simulator" element={<SavingsSimulator />} />
       </Routes>
       <BottomNav />
 

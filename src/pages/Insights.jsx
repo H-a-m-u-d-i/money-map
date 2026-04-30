@@ -1,7 +1,7 @@
 import React from 'react';
 import useStore from '../store/useStore';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, Sankey, Label } from 'recharts';
-import { Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Settings } from 'lucide-react';
+import { Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Settings, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const ICON_MAP = {
@@ -255,6 +255,64 @@ export default function Insights() {
           <p style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent-transfer)' }}>${transfer.toLocaleString()}</p>
         </div>
       </div>
+
+      {/* Invisible Budget */}
+      <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px' }}>
+        <h3 style={{ marginBottom: '4px', fontSize: '15px', fontWeight: '700' }}>🧠 Invisible Budget</h3>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Your natural spending limits, discovered from 3 months of data.</p>
+        {(() => {
+          const results = categories.filter(c => c.type === 'expense').map(cat => {
+            let monthlyAmounts = [];
+            for (let i = 1; i <= 3; i++) {
+              const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+              const total = transactions
+                .filter(t => t.type === 'expense' && t.categoryId === cat.id && new Date(t.date) >= m && new Date(t.date) <= mEnd)
+                .reduce((sum, t) => sum + t.amount, 0);
+              monthlyAmounts.push(total);
+            }
+            const avg = monthlyAmounts.reduce((s, v) => s + v, 0) / 3;
+            const max = Math.max(...monthlyAmounts);
+            const min = Math.min(...monthlyAmounts);
+            const variance = max - min;
+            const isControlled = avg > 0 && variance < avg * 0.5;
+            return { ...cat, avg: Math.round(avg), variance: Math.round(variance), isControlled };
+          }).filter(c => c.avg > 0).sort((a, b) => b.avg - a.avg);
+
+          if (results.length === 0) return <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' }}>Not enough data yet. Keep recording for 3 months!</p>;
+
+          return results.map(cat => (
+            <div key={cat.id} style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cat.isControlled ? '#10b981' : '#f59e0b' }} />
+                  <p style={{ fontSize: '13px', fontWeight: '600' }}>{cat.name}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '800' }}>${cat.avg}/mo</p>
+                  <p style={{ fontSize: '10px', color: cat.isControlled ? '#10b981' : '#f59e0b' }}>
+                    {cat.isControlled ? '✓ Stable' : `⚡ Varies ±$${cat.variance}`}
+                  </p>
+                </div>
+              </div>
+              <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (cat.avg / (results[0]?.avg || 1)) * 100)}%`, background: cat.isControlled ? '#10b981' : '#f59e0b', borderRadius: '2px' }} />
+              </div>
+            </div>
+          ));
+        })()}
+      </div>
+
+      {/* Savings Simulator Link */}
+      <Link to="/savings-simulator" style={{ textDecoration: 'none' }}>
+        <div className="glass-panel" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, rgba(16,185,129,0.07), rgba(0,0,0,0))', border: '1px solid rgba(16,185,129,0.1)' }}>
+          <div>
+            <p style={{ fontWeight: '700', fontSize: '14px' }}>💰 Savings Simulator</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>See where you'll be in 1, 2, 3 years</p>
+          </div>
+          <ChevronRight size={20} color="var(--text-secondary)" />
+        </div>
+      </Link>
     </div>
   );
 }

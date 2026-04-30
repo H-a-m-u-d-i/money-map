@@ -55,6 +55,9 @@ const useStore = create(
       customDateRange: { start: null, end: null },
       loans: [],
       recurring: [],
+      paydayDay: null, // day of month (1-31) user gets paid
+
+      setPaydayDay: (day) => set({ paydayDay: day }),
 
       resetCategories: () => set({ categories: MONEFY_CATEGORIES }),
 
