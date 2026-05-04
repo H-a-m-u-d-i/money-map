@@ -108,6 +108,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
+  const [showSplash, setShowSplash] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     processRecurring();
@@ -150,6 +156,19 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   return (
     <div className="app-container">
+      {showSplash && (
+        <div style={{
+          position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 10000,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeOut 0.5s ease 2s forwards'
+        }}>
+          <div style={{ width: '120px', height: '120px', borderRadius: '30px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', marginBottom: '24px', animation: 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            <img src="/logo.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Money Map" />
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '2px', color: 'white', opacity: 0, animation: 'fadeInUp 0.6s ease 0.4s forwards' }}>MONEY MAP</h1>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', opacity: 0, animation: 'fadeInUp 0.6s ease 0.6s forwards' }}>PREMIUM FINANCE MANAGER</p>
+        </div>
+      )}
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/wallets" element={<Wallets />} />
@@ -191,7 +210,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
           </button>
         </div>
       )}
-      <style>{`@keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }`}</style>
+      <style>{`
+        @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+        @keyframes fadeOut { from { opacity:1; } to { opacity:0; visibility:hidden; } }
+        @keyframes scaleIn { from { opacity:0; transform: scale(0.5); } to { opacity:1; transform: scale(1); } }
+        @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 }
