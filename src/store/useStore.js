@@ -38,6 +38,7 @@ const MONEFY_CATEGORIES = [
   { id: 'cat_taxi', name: 'Taxi', type: 'expense', color: '#fbbf24', icon: 'car' },
   { id: 'cat_toiletry', name: 'Toiletry', type: 'expense', color: '#06b6d4', icon: 'zap' },
   { id: 'cat_transport', name: 'Transport', type: 'expense', color: '#3b82f6', icon: 'car' },
+  { id: 'cat_service_fees', name: 'Service Fees', type: 'expense', color: '#64748b', icon: 'zap' },
   // Income
   { id: 'cat_deposits', name: 'Deposits', type: 'income', color: '#10b981', icon: 'briefcase' },
   { id: 'cat_salary', name: 'Salary', type: 'income', color: '#10b981', icon: 'briefcase' },

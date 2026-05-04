@@ -39,7 +39,9 @@ export default function NewTransaction() {
   const [fromAccountId, setFromAccountId] = useState(existingTxn?.fromAccountId || accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState(existingTxn?.toAccountId || accounts[0]?.id || '');
   const [categoryId, setCategoryId] = useState(existingTxn?.categoryId || '');
+  const [fee, setFee] = useState('');
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showFeeCalculator, setShowFeeCalculator] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(null); // 'from' or 'to'
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -111,6 +113,25 @@ export default function NewTransaction() {
       editTransaction(editId, txnData);
     } else {
       addTransaction(txnData);
+      
+      // If there's a fee, record it as a separate expense
+      if (fee && parseFloat(fee) > 0) {
+        const feeAmount = parseFloat(fee);
+        const feeCategory = categories.find(c => c.id === 'cat_service_fees') || 
+                           categories.find(c => c.name === 'Service Fees') ||
+                           categories.find(c => c.id === 'cat_entertainment') ||
+                           categories.find(c => c.type === 'expense');
+        
+        addTransaction({
+          type: 'expense',
+          amount: feeAmount,
+          note: `Fee: ${note.trim() || type}`,
+          fromAccountId: fromAccountId,
+          toAccountId: null,
+          categoryId: feeCategory?.id || '',
+          date: new Date().toISOString()
+        });
+      }
     }
 
     resetDateView();
@@ -243,6 +264,22 @@ export default function NewTransaction() {
             </div>
           )}
 
+          {(type === 'transfer' || type === 'withdrawal') && (
+            <div className="input-group">
+              <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Service Charge / Fee 
+                <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Optional</span>
+              </label>
+              <div 
+                onClick={() => setShowFeeCalculator(true)}
+                className="input-field"
+                style={{ cursor: 'pointer', textAlign: 'center', fontSize: '20px', fontWeight: '700', color: fee ? 'var(--accent-danger)' : 'var(--text-secondary)' }}
+              >
+                {fee ? `-$${fee}` : '$0.00'}
+              </div>
+            </div>
+          )}
+
           <button 
             className="btn btn-primary" 
             style={{ 
@@ -300,6 +337,14 @@ export default function NewTransaction() {
           value={amount}
           onChange={(val) => setAmount(val)}
           onDone={() => setShowCalculator(false)}
+        />
+      )}
+
+      {showFeeCalculator && (
+        <NumericInputer 
+          value={fee}
+          onChange={(val) => setFee(val)}
+          onDone={() => setShowFeeCalculator(false)}
         />
       )}
     </div>

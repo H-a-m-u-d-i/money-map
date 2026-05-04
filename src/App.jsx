@@ -112,6 +112,14 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   useEffect(() => {
     processRecurring();
     resetDateView();
+    
+    // Ensure Service Fees category exists
+    const categories = useStore.getState().categories;
+    if (!categories.find(c => c.id === 'cat_service_fees' || c.name === 'Service Fees')) {
+      const newCat = { id: 'cat_service_fees', name: 'Service Fees', type: 'expense', color: '#64748b', icon: 'zap' };
+      useStore.setState({ categories: [...categories, newCat] });
+    }
+
     let listener;
     const setupBackButton = async () => {
       try {
