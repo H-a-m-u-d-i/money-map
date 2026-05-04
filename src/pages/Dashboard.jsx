@@ -98,8 +98,7 @@ export default function Dashboard() {
   const speedRatio = velocity.baseline > 0 ? velocity.current / velocity.baseline : 0;
   
   const recentTransactions = filteredTransactions
-    .filter(t => t.note.toLowerCase().includes(searchQuery.toLowerCase()))
-    .slice(0, 15);
+    .filter(t => t.note.toLowerCase().includes(searchQuery.toLowerCase()));
 
   // Derived totals directly from already-filtered transactions
   const periodIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
