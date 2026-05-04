@@ -377,7 +377,9 @@ const useStore = create(
           accounts: get().accounts,
           categories: get().categories,
           transactions: get().transactions,
-          loans: get().loans
+          loans: get().loans,
+          recurring: get().recurring,
+          paydayDay: get().paydayDay
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -395,7 +397,9 @@ const useStore = create(
               accounts: data.accounts || [],
               categories: data.categories || MONEFY_CATEGORIES,
               transactions: data.transactions || [],
-              loans: data.loans || []
+              loans: data.loans || [],
+              recurring: data.recurring || [],
+              paydayDay: data.paydayDay || null
             });
             return true;
           }
