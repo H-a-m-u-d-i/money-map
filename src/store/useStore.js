@@ -382,27 +382,33 @@ const useStore = create(
           paydayDay: get().paydayDay
         };
         const jsonString = JSON.stringify(data, null, 2);
+        const fileName = `money-map-backup-${new Date().toISOString().split('T')[0]}.json`;
         
         try {
-          // Try native sharing first (for Android/iOS)
-          const { Share } = await import('@capacitor/share');
-          const canShare = await Share.canShare();
-          if (canShare.value) {
-            await Share.share({
-              title: 'Money Map Backup',
-              text: jsonString,
-              dialogTitle: 'Save your backup',
-              fileName: `money-map-backup-${new Date().toISOString().split('T')[0]}.json`
-            });
-            return;
-          }
+          const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+          
+          // Request permission if needed
+          try {
+            await Filesystem.requestPermissions();
+          } catch (e) {}
+
+          await Filesystem.writeFile({
+            path: fileName,
+            data: jsonString,
+            directory: Directory.Documents,
+            encoding: Encoding.UTF8,
+            recursive: true
+          });
+          
+          alert(`Backup saved to Documents/${fileName}`);
         } catch (e) {
+          console.error("Local save failed, falling back to browser download", e);
           // Fallback to browser download
           const blob = new Blob([jsonString], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `money-map-backup-${new Date().toISOString().split('T')[0]}.json`;
+          link.download = fileName;
           link.click();
         }
       },
