@@ -372,7 +372,7 @@ const useStore = create(
       },
 
       // Backup & Restore
-      exportData: () => {
+      exportData: async () => {
         const data = {
           accounts: get().accounts,
           categories: get().categories,
@@ -381,12 +381,30 @@ const useStore = create(
           recurring: get().recurring,
           paydayDay: get().paydayDay
         };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `money-map-backup-${new Date().toISOString().split('T')[0]}.json`;
-        link.click();
+        const jsonString = JSON.stringify(data, null, 2);
+        
+        try {
+          // Try native sharing first (for Android/iOS)
+          const { Share } = await import('@capacitor/share');
+          const canShare = await Share.canShare();
+          if (canShare.value) {
+            await Share.share({
+              title: 'Money Map Backup',
+              text: jsonString,
+              dialogTitle: 'Save your backup',
+              fileName: `money-map-backup-${new Date().toISOString().split('T')[0]}.json`
+            });
+            return;
+          }
+        } catch (e) {
+          // Fallback to browser download
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `money-map-backup-${new Date().toISOString().split('T')[0]}.json`;
+          link.click();
+        }
       },
 
       importData: (jsonData) => {

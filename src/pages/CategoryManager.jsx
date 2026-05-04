@@ -27,6 +27,8 @@ export default function CategoryManager() {
 
   const exportData = useStore(state => state.exportData);
   const importData = useStore(state => state.importData);
+  const [showManualImport, setShowManualImport] = useState(false);
+  const [manualJSON, setManualJSON] = useState('');
 
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -219,6 +221,42 @@ export default function CategoryManager() {
             />
           </div>
         </div>
+
+        <button 
+          onClick={() => setShowManualImport(!showManualImport)}
+          style={{ 
+            width: '100%', background: 'transparent', border: 'none', color: 'var(--text-secondary)', 
+            fontSize: '11px', marginTop: '16px', textDecoration: 'underline', cursor: 'pointer' 
+          }}
+        >
+          Trouble with files? Use Manual Rescue
+        </button>
+
+        {showManualImport && (
+          <div style={{ marginTop: '16px', animation: 'fadeIn 0.3s ease' }}>
+            <textarea 
+              placeholder="Paste your backup JSON here..."
+              className="input-field"
+              style={{ width: '100%', height: '120px', fontSize: '11px', padding: '12px', fontFamily: 'monospace' }}
+              value={manualJSON}
+              onChange={(e) => setManualJSON(e.target.value)}
+            />
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', marginTop: '8px', padding: '12px', fontSize: '13px' }}
+              onClick={() => {
+                if (importData(manualJSON)) {
+                  alert('Rescue successful!');
+                  navigate('/');
+                } else {
+                  alert('Invalid JSON data.');
+                }
+              }}
+            >
+              Confirm Rescue
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
