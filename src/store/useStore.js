@@ -67,7 +67,7 @@ const useStore = create(
 
       // Actions
       addAccount: (account) => set((state) => ({
-        accounts: [...state.accounts, { ...account, id: `acc_${Date.now()}` }]
+        accounts: [...state.accounts, { ...account, id: `acc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }]
       })),
 
       updateAccount: (id, updates) => set((state) => ({
@@ -75,7 +75,7 @@ const useStore = create(
       })),
 
       addCategory: (category) => set((state) => ({
-        categories: [...state.categories, { ...category, id: `cat_${Date.now()}` }]
+        categories: [...state.categories, { ...category, id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }]
       })),
 
       updateCategory: (id, updates) => set((state) => ({
@@ -149,7 +149,7 @@ const useStore = create(
       }),
       
       addTransaction: (transaction) => set((state) => {
-        const newTxn = { ...transaction, id: `txn_${Date.now()}` };
+        const newTxn = { ...transaction, id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
         
         // Atomically update account balances based on the transaction type
         const updatedAccounts = state.accounts.map(acc => {
@@ -180,7 +180,7 @@ const useStore = create(
       }),
 
       addLoan: (loan) => set((state) => {
-        const newLoan = { ...loan, id: `loan_${Date.now()}`, status: 'active', payments: [] };
+        const newLoan = { ...loan, id: `loan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, status: 'active', payments: [] };
         
         // Impact on accounts: borrowed = add to wallet, lent = subtract from wallet
         const updatedAccounts = state.accounts.map(acc => {
@@ -308,7 +308,7 @@ const useStore = create(
       }),
 
       addRecurring: (rec) => set((state) => ({
-        recurring: [...state.recurring, { ...rec, id: `rec_${Date.now()}` }]
+        recurring: [...state.recurring, { ...rec, id: `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }]
       })),
 
       deleteRecurring: (id) => set((state) => ({
