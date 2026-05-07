@@ -66,9 +66,56 @@ const useStore = create(
       resetDateView: () => set({ currentDateView: new Date().toISOString() }),
 
       // Actions
-      addAccount: (account) => set((state) => ({
-        accounts: [...state.accounts, { ...account, id: `acc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }]
-      })),
+      addAccount: (account) => set((state) => {
+        const newAccountId = `acc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const initialBalance = account.balance || 0;
+        
+        // Always log opening balance as income for stats accuracy
+        let newTransactions = state.transactions;
+        if (initialBalance > 0) {
+          const openingBalanceTxn = {
+            id: `txn_${Date.now()}_init_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'income',
+            amount: initialBalance,
+            note: `Opening Balance: ${account.name}`,
+            toAccountId: newAccountId,
+            fromAccountId: null,
+            categoryId: 'cat_deposits',
+            date: new Date().toISOString()
+          };
+          newTransactions = [openingBalanceTxn, ...state.transactions];
+        }
+
+        return {
+          accounts: [...state.accounts, { ...account, id: newAccountId, balance: initialBalance }],
+          transactions: newTransactions
+        };
+      }),
+
+      adjustBalance: (accountId, newBalance) => set((state) => {
+        const account = state.accounts.find(a => a.id === accountId);
+        if (!account) return state;
+
+        const diff = newBalance - account.balance;
+        if (diff === 0) return state;
+
+        const adjustmentTxn = {
+          id: `txn_${Date.now()}_adj_${Math.random().toString(36).substr(2, 9)}`,
+          type: diff > 0 ? 'income' : 'expense',
+          amount: Math.abs(diff),
+          note: `Balance Adjustment: ${account.name}`,
+          toAccountId: diff > 0 ? accountId : null,
+          fromAccountId: diff < 0 ? accountId : null,
+          categoryId: diff > 0 ? 'cat_deposits' : 'cat_service_fees',
+          date: new Date().toISOString(),
+          isAdjustment: true
+        };
+
+        return {
+          accounts: state.accounts.map(a => a.id === accountId ? { ...a, balance: newBalance } : a),
+          transactions: [adjustmentTxn, ...state.transactions]
+        };
+      }),
 
       updateAccount: (id, updates) => set((state) => ({
         accounts: state.accounts.map(acc => acc.id === id ? { ...acc, ...updates } : acc)
@@ -384,10 +431,28 @@ const useStore = create(
         const jsonString = JSON.stringify(data, null, 2);
         const fileName = `money-map-backup-${new Date().toISOString().split('T')[0]}.json`;
         
+        // Helper for browser download
+        const triggerBrowserDownload = () => {
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(url);
+        };
+
         try {
+          // Check if we are running in a native environment (Android/iOS)
+          const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
+          
+          if (!isNative) {
+            triggerBrowserDownload();
+            return;
+          }
+
           const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
           
-          // Request permission if needed
           try {
             await Filesystem.requestPermissions();
           } catch (e) {}
@@ -403,13 +468,7 @@ const useStore = create(
           alert(`Backup saved to Documents/${fileName}`);
         } catch (e) {
           console.error("Local save failed, falling back to browser download", e);
-          // Fallback to browser download
-          const blob = new Blob([jsonString], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          link.click();
+          triggerBrowserDownload();
         }
       },
 

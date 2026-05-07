@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useStore from '../store/useStore';
 import { Plus, CreditCard, Landmark, Coins, Edit2, Trash2, X } from 'lucide-react';
+import NumericInputer from '../components/NumericInputer';
 
 export default function Wallets() {
   const accounts = useStore(state => state.accounts);
@@ -8,15 +9,20 @@ export default function Wallets() {
   const updateAccount = useStore(state => state.updateAccount);
   const deleteAccount = useStore(state => state.deleteAccount);
   
+  const adjustBalance = useStore(state => state.adjustBalance);
+  
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   
   const [name, setName] = useState('');
   const [type, setType] = useState('bank');
+  const [balance, setBalance] = useState('');
+  const [showCalculator, setShowCalculator] = useState(false);
   
   const resetForm = () => {
     setName('');
     setType('bank');
+    setBalance('');
     setShowForm(false);
     setEditId(null);
   };
@@ -25,25 +31,26 @@ export default function Wallets() {
     setEditId(acc.id);
     setName(acc.name);
     setType(acc.type);
+    setBalance(acc.balance.toString());
     setShowForm(true);
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!name) return;
     
     const accountData = {
       name,
       type,
-      color: type === 'cash' ? '#10b981' : '#3b82f6'
+      color: type === 'cash' ? '#10b981' : '#3b82f6',
+      balance: parseFloat(balance) || 0
     };
 
     if (editId) {
-      // Keep existing balance when editing name/type
-      updateAccount(editId, accountData);
+      updateAccount(editId, { name: accountData.name, type: accountData.type, color: accountData.color });
+      adjustBalance(editId, accountData.balance);
     } else {
-      // New wallets start at 0
-      addAccount({ ...accountData, balance: 0 });
+      addAccount(accountData);
     }
     
     resetForm();
@@ -52,7 +59,7 @@ export default function Wallets() {
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
   return (
-    <div className="page">
+    <div className="page" style={{ paddingBottom: '100px' }}>
       <div className="flex-between" style={{ marginBottom: '20px' }}>
         <div>
           <h1 className="title" style={{ fontSize: '20px' }}>Wallets</h1>
@@ -65,7 +72,7 @@ export default function Wallets() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '24px', marginBottom: '24px', animation: 'slideDown 0.3s ease' }}>
+        <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', animation: 'slideDown 0.3s ease' }}>
           <h3 style={{ marginBottom: '20px', fontSize: '18px', fontWeight: '700' }}>{editId ? 'Edit Wallet' : 'New Wallet'}</h3>
           
           <div className="input-group">
@@ -78,6 +85,17 @@ export default function Wallets() {
               onChange={(e) => setName(e.target.value)}
               required
             />
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">{editId ? 'Adjust Current Balance' : 'Initial Balance'}</label>
+            <div 
+              onClick={() => setShowCalculator(true)}
+              className="input-field" 
+              style={{ fontSize: '24px', fontWeight: '800', textAlign: 'center', cursor: 'pointer', color: 'var(--accent-success)' }}
+            >
+              {balance || '0.00'}
+            </div>
           </div>
           
           <div className="input-group">
@@ -106,10 +124,18 @@ export default function Wallets() {
             </div>
           </div>
           
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '16px', padding: '16px' }}>
-            {editId ? 'Update Wallet' : 'Create Wallet'}
+          <button onClick={handleSubmit} className="btn btn-primary" style={{ width: '100%', marginTop: '16px', padding: '16px' }}>
+            {editId ? 'Update & Adjust' : 'Create Wallet'}
           </button>
-        </form>
+        </div>
+      )}
+
+      {showCalculator && (
+        <NumericInputer 
+          value={balance} 
+          onChange={setBalance} 
+          onDone={() => setShowCalculator(false)} 
+        />
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

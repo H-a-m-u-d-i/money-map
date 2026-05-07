@@ -234,6 +234,30 @@ export default function CategoryManager() {
 
         {showManualImport && (
           <div style={{ marginTop: '16px', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              <p style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-danger)', marginBottom: '8px' }}>⚠️ SILENT WALLET REPAIR</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Use this to fix incorrect balances without adding history logs. This will change the wallet totals silently.</p>
+              
+              {useStore.getState().accounts.map(acc => (
+                <div key={acc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px' }}>{acc.name}</span>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    style={{ width: '100px', padding: '4px 8px', fontSize: '12px', height: '30px' }}
+                    defaultValue={acc.balance}
+                    onBlur={(e) => {
+                      const newBal = parseFloat(e.target.value);
+                      if (!isNaN(newBal)) {
+                        useStore.getState().updateAccount(acc.id, { balance: newBal });
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+              <p style={{ fontSize: '10px', color: 'var(--accent-success)', marginTop: '8px' }}>Changes are saved as soon as you click out of the box.</p>
+            </div>
+
             <textarea 
               placeholder="Paste your backup JSON here..."
               className="input-field"

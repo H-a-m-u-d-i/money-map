@@ -82,14 +82,6 @@ export default function NewTransaction() {
         handleSubmit(categoryId, cashAcc.id);
         return;
       }
-      if (type === 'income') {
-        if (!toAccountId) {
-          alert("Please select a deposit account.");
-          return;
-        }
-        handleSubmit();
-        return;
-      }
     }
     setStep(step + 1);
   };
@@ -105,7 +97,7 @@ export default function NewTransaction() {
       note: note.trim() || (type === 'income' ? 'Income' : type === 'expense' ? 'Expense' : type === 'withdrawal' ? 'Withdrawal' : 'Transfer'),
       fromAccountId: (type === 'expense' || type === 'transfer' || type === 'withdrawal') ? fromAccountId : null,
       toAccountId: (type === 'income' || type === 'transfer' || type === 'withdrawal') ? finalToAccountId : null,
-      categoryId: type === 'expense' ? finalCategoryId : null,
+      categoryId: (type === 'expense' || type === 'income') ? finalCategoryId : null,
       date: existingTxn ? existingTxn.date : new Date().toISOString()
     };
 
@@ -138,7 +130,7 @@ export default function NewTransaction() {
     navigate('/', { replace: true });
   };
 
-  const filteredCategories = categories.filter(c => c.type === 'expense');
+  const filteredCategories = categories.filter(c => c.type === type);
 
   return (
     <div className="page" style={{ minHeight: '100vh' }}>
@@ -293,7 +285,7 @@ export default function NewTransaction() {
         </div>
       )}
 
-      {step === 2 && type === 'expense' && (
+      {step === 2 && (type === 'expense' || type === 'income') && (
         <div className="animate-in">
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', textAlign: 'center' }}>Choose Category</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>

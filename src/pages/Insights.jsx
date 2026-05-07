@@ -81,10 +81,19 @@ export default function Insights() {
 
   const sankeyData = getSankeyData();
 
+  const [breakdownType, setBreakdownType] = React.useState('expense');
+
   // Calculate expenses by category
   const expensesList = transactions.filter(t => t.type === 'expense');
   const categoryData = categories.filter(c => c.type === 'expense').map(cat => {
     const total = expensesList.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + t.amount, 0);
+    return { name: cat.name, value: total, color: cat.color };
+  }).filter(d => d.value > 0);
+
+  // Calculate income by category
+  const incomeList = transactions.filter(t => t.type === 'income');
+  const incomeCategoryData = categories.filter(c => c.type === 'income').map(cat => {
+    const total = incomeList.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + t.amount, 0);
     return { name: cat.name, value: total, color: cat.color };
   }).filter(d => d.value > 0);
 
@@ -118,32 +127,6 @@ export default function Insights() {
         </Link>
       </div>
       
-      {/* Wealth Flow (Sankey) */}
-      <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px' }}>
-        <h3 style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '600' }}>Wealth Flow</h3>
-        {sankeyData.links.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' }}>Not enough transfer/expense data to show flow.</p>
-        ) : (
-          <div style={{ height: '300px', width: '100%' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <Sankey
-                data={sankeyData}
-                node={{ stroke: 'var(--accent-primary)', strokeWidth: 2 }}
-                link={{ stroke: 'var(--accent-primary)', strokeOpacity: 0.2 }}
-                margin={{ top: 20, left: 10, right: 10, bottom: 20 }}
-              >
-                <Tooltip 
-                  contentStyle={{ background: 'var(--bg-surface-elevated)', border: 'none', borderRadius: '8px' }}
-                />
-              </Sankey>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-              <span>ACCOUNTS</span>
-              <span>DESTINATIONS</span>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Monthly Comparison */}
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px', height: '240px' }}>
@@ -164,81 +147,74 @@ export default function Insights() {
         </ResponsiveContainer>
       </div>
 
-      {/* Category Breakdown (Circular Dashboard Style) */}
+      {/* Breakdown (Income/Expense Toggle) */}
       <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <h3 style={{ marginBottom: '8px', fontSize: '18px', fontWeight: '800' }}>Expense Breakdown</h3>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
+          {['expense', 'income'].map(t => (
+            <button 
+              key={t}
+              onClick={() => setBreakdownType(t)}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', border: 'none', fontSize: '12px', fontWeight: '700',
+                background: breakdownType === t ? 'var(--accent-primary)' : 'transparent',
+                color: breakdownType === t ? 'white' : 'var(--text-secondary)',
+                textTransform: 'capitalize', cursor: 'pointer'
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <h3 style={{ marginBottom: '8px', fontSize: '18px', fontWeight: '800' }}>
+          {breakdownType === 'expense' ? 'Expense Breakdown' : 'Income Sources'}
+        </h3>
         
-        {categoryData.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>No expenses recorded this month.</p>
-        ) : (
-          <div style={{ width: '100%', height: '320px', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={100}
-                  paddingAngle={8}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                  <Label 
-                    value={`$${expense.toLocaleString()}`} 
-                    position="center" 
-                    fill="white" 
-                    style={{ fontSize: '20px', fontWeight: '800' }} 
+        {(() => {
+          const currentData = breakdownType === 'expense' ? categoryData : incomeCategoryData;
+          const totalVal = breakdownType === 'expense' ? expense : income;
+
+          if (currentData.length === 0) {
+            return <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>No {breakdownType} recorded this month.</p>;
+          }
+
+          return (
+            <div style={{ width: '100%', height: '400px', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={currentData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={105}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="none"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1.5 }}
+                    style={{ fontSize: '11px', fontWeight: '800' }}
+                  >
+                    {currentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                    <Label 
+                      value={`$${totalVal.toLocaleString()}`} 
+                      position="center" 
+                      fill="white" 
+                      style={{ fontSize: '16px', fontWeight: '800' }} 
+                    />
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ background: 'var(--bg-surface-elevated)', border: 'none', borderRadius: '8px' }}
                   />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* Floating Category Icons around the chart */}
-            {categoryData.map((cat, index) => {
-              const angle = (index / categoryData.length) * 360 - 90;
-              const radius = 135;
-              const x = Math.cos((angle * Math.PI) / 180) * radius;
-              const y = Math.sin((angle * Math.PI) / 180) * radius;
-              
-              const catObj = categories.find(c => c.name === cat.name);
-              const Icon = ICON_MAP[catObj?.icon] || MoreHorizontal;
-
-              return (
-                <div 
-                  key={index}
-                  style={{
-                    position: 'absolute',
-                    top: `calc(50% + ${y}px)`,
-                    left: `calc(50% + ${x}px)`,
-                    transform: 'translate(-50%, -50%)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    zIndex: 10
-                  }}
-                >
-                  <div style={{ 
-                    width: '36px', height: '36px', borderRadius: '10px', 
-                    background: 'var(--bg-surface-elevated)', border: `1px solid ${cat.color}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: cat.color, marginBottom: '2px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                  }}>
-                    <Icon size={18} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '700' }}>
-                    {((cat.value / expense) * 100).toFixed(0)}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
       </div>
+
 
       {/* Quick Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
