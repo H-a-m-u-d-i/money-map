@@ -11,6 +11,10 @@ import RecurringManager from './pages/RecurringManager';
 import HealthScore from './pages/HealthScore';
 import SavingsSimulator from './pages/SavingsSimulator';
 import useStore from './store/useStore';
+import { Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw } from 'lucide-react';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { googleProvider } from './lib/firebase';
 
 // Main tab routes — these replace history so they never stack
 const MAIN_TABS = ['/', '/wallets', '/loans', '/insights'];
@@ -108,7 +112,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
+  const { user, setUser, syncToCloud, lastSynced, pullFromCloud } = useStore();
+  
   const [showSplash, setShowSplash] = React.useState(true);
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+  const [syncing, setSyncing] = React.useState(false);
+  const [showSyncPrompt, setShowSyncPrompt] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
@@ -116,6 +125,25 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   }, []);
 
   useEffect(() => {
+    // 1. Listen for Auth Changes
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      // If user just logged in and we have no local data, suggest a pull
+      if (firebaseUser && useStore.getState().accounts.length === 0) {
+        setShowSyncPrompt(true);
+      }
+    });
+
+    // 2. Listen for Network Changes
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (useStore.getState().user) setShowSyncPrompt(true);
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     processRecurring();
     resetDateView();
     
@@ -149,13 +177,124 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     };
     setupBackButton();
     return () => {
+      unsubscribeAuth();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
-  }, [location.pathname, navigate, setShowExitConfirm, processRecurring, resetDateView]);
+  }, [location.pathname, navigate, setShowExitConfirm, processRecurring, resetDateView, setUser]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    const success = await syncToCloud();
+    setSyncing(false);
+    if (success) setShowSyncPrompt(false);
+  };
+
+  const handleRestore = async () => {
+    if (window.confirm("Restore data from cloud? This will overwrite your current local data.")) {
+      setSyncing(true);
+      const success = await pullFromCloud();
+      setSyncing(false);
+      if (success) {
+        alert("Data restored successfully!");
+        setShowSyncPrompt(false);
+      }
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      console.error("Login failed", e);
+    }
+  };
 
   return (
     <div className="app-container">
+      {/* Cloud Status Header Bar */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: '40px',
+        background: 'rgba(10, 10, 15, 0.4)', backdropFilter: 'blur(10px)',
+        zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 20px', fontSize: '10px', color: 'rgba(255,255,255,0.4)',
+        fontWeight: '600', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-success)' }}>
+              <Cloud size={12} />
+              <span>CLOUD ACTIVE</span>
+            </div>
+          ) : (
+            <div onClick={handleLogin} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <CloudOff size={12} />
+              <span>GUEST MODE (TAP TO SYNC)</span>
+            </div>
+          )}
+        </div>
+        <div>
+          {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
+        </div>
+      </div>
+
+      {/* Sync Prompt Banner */}
+      {showSyncPrompt && isOnline && user && (
+        <div style={{
+          position: 'fixed', top: '50px', left: '20px', right: '20px',
+          background: 'var(--accent-primary)', color: 'white', borderRadius: '16px',
+          padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <RefreshCw size={24} className={syncing ? 'spin' : ''} />
+            <div>
+              <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Sync Available</p>
+              <p style={{ fontSize: '11px', opacity: 0.8 }}>Backup your latest data now.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
+            <button 
+              onClick={handleSync} 
+              disabled={syncing}
+              style={{ background: 'white', color: 'var(--accent-primary)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
+            >
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Prompt (Emergency) */}
+      {showSyncPrompt && isOnline && user && useStore.getState().accounts.length === 0 && (
+        <div style={{
+          position: 'fixed', top: '50px', left: '20px', right: '20px',
+          background: 'var(--accent-success)', color: 'white', borderRadius: '16px',
+          padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CloudUpload size={24} />
+            <div>
+              <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Data Found!</p>
+              <p style={{ fontSize: '11px', opacity: 0.8 }}>Restore your previous backup?</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleRestore} 
+            disabled={syncing}
+            style={{ background: 'white', color: 'var(--accent-success)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
+          >
+            {syncing ? 'Restoring...' : 'Restore'}
+          </button>
+        </div>
+      )}
+
       {showSplash && (
         <div style={{
           position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 10000,
@@ -212,9 +351,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       )}
       <style>{`
         @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+        @keyframes slideDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: translateY(0); } }
         @keyframes fadeOut { from { opacity:1; } to { opacity:0; visibility:hidden; } }
         @keyframes scaleIn { from { opacity:0; transform: scale(0.5); } to { opacity:1; transform: scale(1); } }
         @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import localforage from 'localforage';
+import { auth, db, cloudSync } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // Configure localforage for offline persistence
 localforage.config({
@@ -76,6 +78,8 @@ const useStore = create(
       recurring: [],
       paydayDay: null, // day of month (1-31) user gets paid
       hasData: false, // Safety flag to detect if the app was ever used
+      user: null, // Firebase user object
+      lastSynced: null,
 
       setPaydayDay: (day) => set({ paydayDay: day }),
 
@@ -558,6 +562,42 @@ const useStore = create(
           }
         } catch (e) {}
 
+        return false;
+      },
+
+      // Firebase Cloud Sync Actions
+      setUser: (user) => set({ user }),
+      
+      syncToCloud: async () => {
+        const { user, accounts, transactions, categories, loans, recurring, paydayDay } = get();
+        if (!user) return false;
+        
+        const dataToSync = { accounts, transactions, categories, loans, recurring, paydayDay };
+        const success = await cloudSync.saveData(user.uid, dataToSync);
+        if (success) {
+          set({ lastSynced: new Date().toISOString() });
+        }
+        return success;
+      },
+
+      pullFromCloud: async () => {
+        const { user } = get();
+        if (!user) return false;
+
+        const cloudData = await cloudSync.fetchData(user.uid);
+        if (cloudData) {
+          set({
+            accounts: cloudData.accounts || [],
+            transactions: cloudData.transactions || [],
+            categories: cloudData.categories || [],
+            loans: cloudData.loans || [],
+            recurring: cloudData.recurring || [],
+            paydayDay: cloudData.paydayDay || null,
+            hasData: true,
+            lastSynced: cloudData.lastUpdated
+          });
+          return true;
+        }
         return false;
       }
     }),
