@@ -1,5 +1,8 @@
 {
 	"appId": "com.moneymap.app",
 	"appName": " Money Map",
-	"webDir": "dist"
+	"webDir": "dist",
+	"server": {
+		"url": "http://172.27.96.1:3000"
+	}
 }
