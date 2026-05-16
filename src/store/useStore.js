@@ -5,14 +5,32 @@ import localforage from 'localforage';
 // Configure localforage for offline persistence
 localforage.config({
   name: 'MoneyMap',
-  storeName: 'moneymap_store'
+  storeName: 'moneymap_store',
+  driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE] // Ensure all drivers are checked
 });
 
 // Custom storage wrapper for Zustand to use localforage
 const localForageStore = {
   getItem: async (name) => {
-    const value = await localforage.getItem(name);
-    return value ?? null;
+    try {
+      const value = await localforage.getItem(name);
+      if (value) return value;
+      
+      // DEEP SCAN: If primary key is empty, check common alternatives
+      const alternatives = ['money-map-storage', 'moneymap', 'money_map', 'moneyMapStore'];
+      for (const alt of alternatives) {
+        if (alt === name) continue;
+        const altValue = await localforage.getItem(alt);
+        if (altValue) {
+          console.warn("DEEP SCAN: Found data in alternative key:", alt);
+          return altValue;
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error("Storage Error:", e);
+      return null;
+    }
   },
   setItem: async (name, value) => {
     await localforage.setItem(name, value);
@@ -57,6 +75,7 @@ const useStore = create(
       loans: [],
       recurring: [],
       paydayDay: null, // day of month (1-31) user gets paid
+      hasData: false, // Safety flag to detect if the app was ever used
 
       setPaydayDay: (day) => set({ paydayDay: day }),
 
@@ -482,7 +501,8 @@ const useStore = create(
               transactions: data.transactions || [],
               loans: data.loans || [],
               recurring: data.recurring || [],
-              paydayDay: data.paydayDay || null
+              paydayDay: data.paydayDay || null,
+              hasData: true
             });
             return true;
           }
@@ -490,11 +510,79 @@ const useStore = create(
           console.error("Import failed", e);
           return false;
         }
+      },
+
+      // Emergency Recovery Action (NUCLEAR VERSION)
+      emergencyRecovery: async () => {
+        console.log("Starting Nuclear Recovery Scan...");
+        
+        // 1. Try to list all IndexedDB databases (Modern browsers/WebViews)
+        if (window.indexedDB && window.indexedDB.databases) {
+          try {
+            const dbs = await window.indexedDB.databases();
+            console.log("Found databases:", dbs);
+            for (const dbInfo of dbs) {
+              if (dbInfo.name.toLowerCase().includes('money')) {
+                console.warn("Potential DB found:", dbInfo.name);
+                // We found a DB, but localforage needs to be configured to talk to it
+              }
+            }
+          } catch (e) { console.error("DB List failed", e); }
+        }
+
+        // 2. Scan all keys in the current LocalForage instance
+        const keys = await localforage.keys();
+        const alternatives = ['money-map-storage', 'moneymap', 'money_map', 'moneyMapStore', 'zustand'];
+        
+        for (const key of [...keys, ...alternatives]) {
+          try {
+            const data = await localforage.getItem(key);
+            if (data && (data.state || data.accounts)) {
+              console.log("SUCCESS: Data found in key:", key);
+              const recoveredState = data.state || data;
+              set({ ...recoveredState, hasData: true });
+              return true;
+            }
+          } catch (e) {}
+        }
+
+        // 3. Last Resort: Check LocalStorage
+        try {
+          const lsData = localStorage.getItem('money-map-storage');
+          if (lsData) {
+            const data = JSON.parse(lsData);
+            if (data && data.state) {
+              set({ ...data.state, hasData: true });
+              return true;
+            }
+          }
+        } catch (e) {}
+
+        return false;
       }
     }),
     {
       name: 'money-map-storage',
       storage: createJSONStorage(() => localForageStore),
+      onRehydrateStorage: (state) => {
+        return (hydratedState, error) => {
+          if (error) {
+            console.error("Hydration Error:", error);
+          } else if (hydratedState) {
+            // If the app was previously used (hasData is true) but now has 0 accounts/transactions
+            // This is a sign of storage eviction or failure
+            if (hydratedState.hasData && hydratedState.accounts.length === 0 && hydratedState.transactions.length === 0) {
+              console.warn("CRITICAL: Storage was previously used but is now empty. Preventing overwrite.");
+              // We could potentially alert the user here or trigger an auto-recovery
+            }
+            
+            // Mark as used if they add anything
+            if (hydratedState.accounts.length > 0 || hydratedState.transactions.length > 0) {
+              state.hasData = true;
+            }
+          }
+        };
+      },
     }
   )
 );

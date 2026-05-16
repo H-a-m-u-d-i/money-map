@@ -235,6 +235,25 @@ export default function CategoryManager() {
         {showManualImport && (
           <div style={{ marginTop: '16px', animation: 'fadeIn 0.3s ease' }}>
             <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              <div className="flex-between" style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: '10px' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent-danger)' }}>Emergency Data Recovery</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Scan for hidden old data backups.</p>
+                </div>
+                <button 
+                  onClick={async () => {
+                    if (window.confirm("Attempt to recover lost data? This will scan for older database snapshots.")) {
+                      const success = await useStore.getState().emergencyRecovery();
+                      if (success) alert("Data found and restored!");
+                      else alert("No alternative data found in storage.");
+                    }
+                  }}
+                  className="btn" 
+                  style={{ padding: '8px 16px', background: 'var(--accent-danger)', color: 'white', borderRadius: '8px', fontSize: '12px' }}
+                >
+                  Scan Storage
+                </button>
+              </div>
               <p style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-danger)', marginBottom: '8px' }}>⚠️ SILENT WALLET REPAIR</p>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Use this to fix incorrect balances without adding history logs. This will change the wallet totals silently.</p>
               
