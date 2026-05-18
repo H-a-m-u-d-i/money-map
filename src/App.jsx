@@ -11,10 +11,9 @@ import RecurringManager from './pages/RecurringManager';
 import HealthScore from './pages/HealthScore';
 import SavingsSimulator from './pages/SavingsSimulator';
 import useStore from './store/useStore';
-import { Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw } from 'lucide-react';
+import { Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { googleProvider } from './lib/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 // Main tab routes — these replace history so they never stack
 const MAIN_TABS = ['/', '/wallets', '/loans', '/insights'];
@@ -118,6 +117,13 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [syncing, setSyncing] = React.useState(false);
   const [showSyncPrompt, setShowSyncPrompt] = React.useState(false);
+  
+  // Auth Modal State
+  const [showLoginModal, setShowLoginModal] = React.useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [isSignUp, setIsSignUp] = React.useState(false);
+  const [authError, setAuthError] = React.useState('');
 
   React.useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
@@ -204,16 +210,30 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     }
   };
 
-  const handleLogin = async () => {
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
     try {
-      await signInWithPopup(auth, googleProvider);
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      setShowLoginModal(false);
     } catch (e) {
-      console.error("Login failed", e);
+      console.error("Auth failed", e);
+      setAuthError(e.message.replace('Firebase: ', ''));
+    }
+  };
+
+  const handleLogout = () => {
+    if(window.confirm("Sign out of Cloud Sync?")) {
+      signOut(auth);
     }
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ paddingTop: '40px' }}>
       {/* Cloud Status Header Bar */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '40px',
@@ -224,21 +244,65 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-success)' }}>
+            <div onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-success)', cursor: 'pointer' }}>
               <Cloud size={12} />
               <span>CLOUD ACTIVE</span>
             </div>
           ) : (
-            <div onClick={handleLogin} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+            <div onClick={() => setShowLoginModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
               <CloudOff size={12} />
-              <span>GUEST MODE (TAP TO SYNC)</span>
+              <span>GUEST MODE (TAP TO LOGIN)</span>
             </div>
           )}
         </div>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
+          {user && (
+            <button 
+              onClick={handleSync} 
+              disabled={syncing}
+              style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800' }}
+            >
+              {syncing ? '...' : 'SYNC'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Auth Modal */}
+      {showLoginModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{ background: 'var(--bg-surface-elevated)', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '350px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800' }}>{isSignUp ? 'Create Cloud Account' : 'Cloud Login'}</h2>
+              <X size={24} onClick={() => setShowLoginModal(false)} style={{ color: 'var(--text-secondary)' }} />
+            </div>
+            
+            <form onSubmit={handleAuthSubmit}>
+              <input 
+                type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required
+                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '12px' }}
+              />
+              <input 
+                type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
+                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px' }}
+              />
+              {authError && <p style={{ color: 'var(--accent-danger)', fontSize: '11px', marginBottom: '12px' }}>{authError}</p>}
+              
+              <button type="submit" style={{ width: '100%', padding: '12px', background: 'var(--accent-primary)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', marginTop: '8px' }}>
+                {isSignUp ? 'Sign Up' : 'Login'}
+              </button>
+            </form>
+            
+            <p onClick={() => setIsSignUp(!isSignUp)} style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '16px', cursor: 'pointer' }}>
+              {isSignUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Sync Prompt Banner */}
       {showSyncPrompt && isOnline && user && (

@@ -1,9 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// REPLACE THESE with your real values from Firebase Console
 const firebaseConfig = {
   apiKey: "AIzaSyBMTr0CttrANaQX6vuSxJeqareDiWdzqMk",
   authDomain: "money-map-a20a2.firebaseapp.com",
@@ -17,7 +16,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const googleProvider = new GoogleAuthProvider();
 
 // Utility functions for Cloud Sync
 export const cloudSync = {
