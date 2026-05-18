@@ -40,6 +40,7 @@ export default function NewTransaction() {
   const [toAccountId, setToAccountId] = useState(existingTxn?.toAccountId || accounts[0]?.id || '');
   const [categoryId, setCategoryId] = useState(existingTxn?.categoryId || '');
   const [fee, setFee] = useState('');
+  const [customDate, setCustomDate] = useState(existingTxn?.date ? new Date(existingTxn.date).toISOString().split('T')[0] : '');
   const [showCalculator, setShowCalculator] = useState(false);
   const [showFeeCalculator, setShowFeeCalculator] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(null); // 'from' or 'to'
@@ -98,7 +99,7 @@ export default function NewTransaction() {
       fromAccountId: (type === 'expense' || type === 'transfer' || type === 'withdrawal') ? fromAccountId : null,
       toAccountId: (type === 'income' || type === 'transfer' || type === 'withdrawal') ? finalToAccountId : null,
       categoryId: (type === 'expense' || type === 'income') ? finalCategoryId : null,
-      date: existingTxn ? existingTxn.date : new Date().toISOString()
+      date: existingTxn ? existingTxn.date : (customDate ? new Date(customDate).toISOString() : new Date().toISOString())
     };
 
     if (editId) {
@@ -121,7 +122,7 @@ export default function NewTransaction() {
           fromAccountId: fromAccountId,
           toAccountId: null,
           categoryId: feeCategory?.id || '',
-          date: new Date().toISOString()
+          date: existingTxn ? existingTxn.date : (customDate ? new Date(customDate).toISOString() : new Date().toISOString())
         });
       }
     }
@@ -224,6 +225,21 @@ export default function NewTransaction() {
                 }
               </div>
             )}
+          </div>
+
+          <div className="input-group">
+            <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              Date
+              <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Optional (Defaults to Today)</span>
+            </label>
+            <input 
+              type="date" 
+              className="input-field" 
+              value={customDate}
+              onChange={e => setCustomDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]} // Cannot pick future dates for standard transactions
+              style={{ textAlign: 'center', fontSize: '16px', colorScheme: 'dark' }}
+            />
           </div>
 
           {(type === 'transfer' || type === 'withdrawal' || type === 'expense') && (
