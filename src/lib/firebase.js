@@ -5,12 +5,12 @@ import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } 
 // Your web app's Firebase configuration
 // REPLACE THESE with your real values from Firebase Console
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBMTr0CttrANaQX6vuSxJeqareDiWdzqMk",
+  authDomain: "money-map-a20a2.firebaseapp.com",
+  projectId: "money-map-a20a2",
+  storageBucket: "money-map-a20a2.firebasestorage.app",
+  messagingSenderId: "356647313408",
+  appId: "1:356647313408:web:83ad6d973a0c6c1a98b8e5"
 };
 
 // Initialize Firebase
