@@ -568,10 +568,26 @@ const useStore = create(
       // Firebase Cloud Sync Actions
       setUser: (user) => set({ user }),
       
-      syncToCloud: async () => {
+      syncToCloud: async (force = false) => {
         const { user, accounts, transactions, categories, loans, recurring, paydayDay } = get();
         if (!user) return false;
         
+        const localIsEmpty = (accounts.length === 0 && transactions.length === 0);
+        const existingCloudData = await cloudSync.fetchData(user.uid);
+        const cloudHasData = existingCloudData && ((existingCloudData.accounts && existingCloudData.accounts.length > 0) || (existingCloudData.transactions && existingCloudData.transactions.length > 0));
+
+        // Safety Guard: Prevent overwriting existing cloud data with 0/empty local records
+        if (!force && localIsEmpty && cloudHasData) {
+          console.warn("SAFETY GUARD: Prevented syncing empty local state over non-empty cloud data.");
+          alert("Safety Alert: Your local device is empty (0.0 balance), but existing data was found on the Cloud! Sync was stopped to prevent data loss. Please tap 'Restore' instead to get your data back.");
+          return false;
+        }
+
+        // Create backup snapshot of existing cloud data before overwriting (if cloud had data)
+        if (cloudHasData) {
+          await cloudSync.createBackupSnapshot(user.uid, existingCloudData);
+        }
+
         const dataToSync = { accounts, transactions, categories, loans, recurring, paydayDay };
         const success = await cloudSync.saveData(user.uid, dataToSync);
         if (success) {
@@ -585,6 +601,37 @@ const useStore = create(
         if (!user) return false;
 
         const cloudData = await cloudSync.fetchData(user.uid);
+        if (cloudData && (cloudData.accounts?.length > 0 || cloudData.transactions?.length > 0)) {
+          set({
+            accounts: cloudData.accounts || [],
+            transactions: cloudData.transactions || [],
+            categories: cloudData.categories || [],
+            loans: cloudData.loans || [],
+            recurring: cloudData.recurring || [],
+            paydayDay: cloudData.paydayDay || null,
+            hasData: true,
+            lastSynced: cloudData.lastUpdated
+          });
+          return true;
+        }
+
+        // If main cloud doc is empty, check if there are subcollection backups!
+        const backups = await cloudSync.fetchBackups(user.uid);
+        const validBackup = backups.find(b => (b.accounts && b.accounts.length > 0) || (b.transactions && b.transactions.length > 0));
+        if (validBackup) {
+          set({
+            accounts: validBackup.accounts || [],
+            transactions: validBackup.transactions || [],
+            categories: validBackup.categories || [],
+            loans: validBackup.loans || [],
+            recurring: validBackup.recurring || [],
+            paydayDay: validBackup.paydayDay || null,
+            hasData: true,
+            lastSynced: validBackup.backedUpAt || validBackup.lastUpdated
+          });
+          return true;
+        }
+
         if (cloudData) {
           set({
             accounts: cloudData.accounts || [],
@@ -598,6 +645,7 @@ const useStore = create(
           });
           return true;
         }
+
         return false;
       }
     }),

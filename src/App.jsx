@@ -304,59 +304,63 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
         </div>
       )}
 
-      {/* Sync Prompt Banner */}
+      {/* Sync / Restore Prompt Banners */}
       {showSyncPrompt && isOnline && user && (
-        <div style={{
-          position: 'fixed', top: '50px', left: '20px', right: '20px',
-          background: 'var(--accent-primary)', color: 'white', borderRadius: '16px',
-          padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-          animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <RefreshCw size={24} className={syncing ? 'spin' : ''} />
-            <div>
-              <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Sync Available</p>
-              <p style={{ fontSize: '11px', opacity: 0.8 }}>Backup your latest data now.</p>
+        useStore.getState().accounts.length === 0 && useStore.getState().transactions.length === 0 ? (
+          /* Restore Prompt (when device is empty) */
+          <div style={{
+            position: 'fixed', top: '50px', left: '20px', right: '20px',
+            background: 'var(--accent-success)', color: 'white', borderRadius: '16px',
+            padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CloudUpload size={24} />
+              <div>
+                <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Restore Available</p>
+                <p style={{ fontSize: '11px', opacity: 0.9 }}>Local device is empty. Restore your cloud records?</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
+              <button 
+                onClick={handleRestore} 
+                disabled={syncing}
+                style={{ background: 'white', color: 'var(--accent-success)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
+              >
+                {syncing ? 'Restoring...' : 'Restore Data'}
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
-            <button 
-              onClick={handleSync} 
-              disabled={syncing}
-              style={{ background: 'white', color: 'var(--accent-primary)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
-            >
-              {syncing ? 'Syncing...' : 'Sync Now'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Restore Prompt (Emergency) */}
-      {showSyncPrompt && isOnline && user && useStore.getState().accounts.length === 0 && (
-        <div style={{
-          position: 'fixed', top: '50px', left: '20px', right: '20px',
-          background: 'var(--accent-success)', color: 'white', borderRadius: '16px',
-          padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-          animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CloudUpload size={24} />
-            <div>
-              <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Data Found!</p>
-              <p style={{ fontSize: '11px', opacity: 0.8 }}>Restore your previous backup?</p>
+        ) : (
+          /* Sync Prompt (when device has non-empty local data) */
+          <div style={{
+            position: 'fixed', top: '50px', left: '20px', right: '20px',
+            background: 'var(--accent-primary)', color: 'white', borderRadius: '16px',
+            padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <RefreshCw size={24} className={syncing ? 'spin' : ''} />
+              <div>
+                <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Sync Available</p>
+                <p style={{ fontSize: '11px', opacity: 0.8 }}>Backup your latest local data to Cloud.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
+              <button 
+                onClick={handleSync} 
+                disabled={syncing}
+                style={{ background: 'white', color: 'var(--accent-primary)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
+              >
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </button>
             </div>
           </div>
-          <button 
-            onClick={handleRestore} 
-            disabled={syncing}
-            style={{ background: 'white', color: 'var(--accent-success)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
-          >
-            {syncing ? 'Restoring...' : 'Restore'}
-          </button>
-        </div>
+        )
       )}
 
       {showSplash && (
