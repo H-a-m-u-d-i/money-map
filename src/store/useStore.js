@@ -80,6 +80,7 @@ const useStore = create(
       hasData: false, // Safety flag to detect if the app was ever used
       user: null, // Firebase user object
       lastSynced: null,
+      _hasHydrated: false, // True once localforage has finished loading persisted data
 
       setPaydayDay: (day) => set({ paydayDay: day }),
 
@@ -685,7 +686,6 @@ const useStore = create(
             // This is a sign of storage eviction or failure
             if (hydratedState.hasData && hydratedState.accounts.length === 0 && hydratedState.transactions.length === 0) {
               console.warn("CRITICAL: Storage was previously used but is now empty. Preventing overwrite.");
-              // We could potentially alert the user here or trigger an auto-recovery
             }
             
             // Mark as used if they add anything
@@ -693,6 +693,10 @@ const useStore = create(
               state.hasData = true;
             }
           }
+          // CRITICAL: Mark hydration complete so App.jsx knows local storage has been fully loaded
+          // Without this flag, verifyDataIntegrity runs BEFORE localforage loads data and
+          // falsely shows the mandatory restore screen on every web refresh.
+          useStore.setState({ _hasHydrated: true });
         };
       },
     }

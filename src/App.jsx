@@ -107,6 +107,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
   const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists, accounts, transactions } = useStore();
+  const _hasHydrated = useStore(state => state._hasHydrated);
   
   const hasLocalRecords = (accounts.length > 0 || transactions.length > 0);
 
@@ -131,23 +132,60 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const [pwdMsg, setPwdMsg] = React.useState({ type: '', text: '' });
   const [changingPwd, setChangingPwd] = React.useState(false);
 
+  // Ref to track the firebase user so we can re-verify after hydration
+  const pendingVerifyUser = useRef(null);
+
   React.useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Check if mandatory data recovery is required
+  // CRITICAL FIX: Only run verifyDataIntegrity AFTER localforage has fully loaded persisted data.
+  // Without this wait, the store shows accounts=[] on every page load/refresh because
+  // IndexedDB/localforage is async and hasn't returned the data yet when Firebase Auth fires.
   const verifyDataIntegrity = async (firebaseUser) => {
     if (!firebaseUser) return;
+
+    // Wait up to 3 seconds for localforage hydration to complete
+    let waited = 0;
+    while (!useStore.getState()._hasHydrated && waited < 3000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
+    }
+
     const store = useStore.getState();
     const localIsEmpty = store.accounts.length === 0 && store.transactions.length === 0;
 
     if (localIsEmpty) {
       const cloudHasData = await checkCloudDataExists();
       if (cloudHasData) {
-        console.warn("MANDATORY RESTORE: Local storage is empty (0.0), but Cloud has data. Blocking UI.");
+        console.warn("MANDATORY RESTORE: Local storage is truly empty, Cloud has data. Blocking UI.");
         setMandatoryRestore(true);
       }
+    }
+  };
+
+  // Re-run verifyDataIntegrity once hydration is complete (for the case where
+  // Auth fires before localforage finishes loading)
+  useEffect(() => {
+    if (_hasHydrated && pendingVerifyUser.current) {
+      verifyDataIntegrity(pendingVerifyUser.current);
+      pendingVerifyUser.current = null;
+    }
+  }, [_hasHydrated]);
+
+  // Auto-sync helper — only syncs when local has real records
+  const doAutoSync = async () => {
+    const state = useStore.getState();
+    if (!state.user) return;
+    if (state.accounts.length === 0 && state.transactions.length === 0) {
+      // Empty local — check if mandatory restore is needed instead
+      await verifyDataIntegrity(state.user);
+    } else {
+      console.log("Auto-syncing to Cloud...");
+      setSyncing(true);
+      await state.syncToCloud(false, true); // silent
+      setSyncing(false);
     }
   };
 
@@ -156,29 +194,47 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        await verifyDataIntegrity(firebaseUser);
+        if (!useStore.getState()._hasHydrated) {
+          // Store not hydrated yet — save user ref and run after hydration
+          pendingVerifyUser.current = firebaseUser;
+        } else {
+          await verifyDataIntegrity(firebaseUser);
+        }
       }
     });
 
-    // 2. Listen for Network Changes (Auto-sync when online ONLY IF local has records)
+    // 2. Web: window online/offline events (works in browser)
     const handleOnline = async () => {
       setIsOnline(true);
-      const state = useStore.getState();
-      if (state.user) {
-        if (state.accounts.length === 0 && state.transactions.length === 0) {
-          await verifyDataIntegrity(state.user);
-        } else {
-          console.log("Internet Connected! Auto-syncing to Cloud...");
-          setSyncing(true);
-          await syncToCloud(false, true); // silent auto-sync
-          setSyncing(false);
-        }
-      }
+      await doAutoSync();
     };
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // 3. Mobile: @capacitor/network for reliable Android network detection
+    let capNetworkListener = null;
+    const setupCapacitorNetwork = async () => {
+      try {
+        const { Network } = await import('@capacitor/network');
+        // Get initial status
+        const status = await Network.getStatus();
+        setIsOnline(status.connected);
+
+        // Listen for changes
+        capNetworkListener = await Network.addListener('networkStatusChange', async (netStatus) => {
+          setIsOnline(netStatus.connected);
+          if (netStatus.connected) {
+            console.log("Capacitor: Network connected. Auto-syncing...");
+            await doAutoSync();
+          }
+        });
+      } catch (e) {
+        // Not in Capacitor context (web) — window events handle it
+        console.log("Capacitor Network plugin not available (web mode). Using window events.");
+      }
+    };
+    setupCapacitorNetwork();
 
     processRecurring();
     resetDateView();
@@ -212,6 +268,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       unsubscribeAuth();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (capNetworkListener) capNetworkListener.remove();
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
