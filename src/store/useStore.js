@@ -573,18 +573,19 @@ const useStore = create(
         if (!user) return { success: false, error: 'No user logged in' };
         
         const localIsEmpty = (accounts.length === 0 && transactions.length === 0);
+
+        // ABSOLUTE GUARD: Cannot sync empty local records to cloud under any circumstance
+        if (localIsEmpty) {
+          console.warn("SYNC BLOCKED: Device has 0 local records.");
+          if (!isSilent) {
+            alert("Sync Disabled: Your device has 0 records. Please tap 'Restore' to load your data from Cloud.");
+          }
+          return { success: false, error: 'Cannot sync 0 records. Use Restore instead.' };
+        }
+
         const fetchRes = await cloudSync.fetchData(user.uid);
         const existingCloudData = fetchRes.success ? fetchRes.data : null;
         const cloudHasData = existingCloudData && ((existingCloudData.accounts && existingCloudData.accounts.length > 0) || (existingCloudData.transactions && existingCloudData.transactions.length > 0));
-
-        // Safety Guard: Prevent overwriting existing cloud data with 0/empty local records
-        if (!force && localIsEmpty && cloudHasData) {
-          console.warn("SAFETY GUARD: Prevented syncing empty local state over non-empty cloud data.");
-          if (!isSilent) {
-            alert("Safety Alert: Your local device is empty (0.0 balance), but existing data was found on the Cloud! Sync was stopped to prevent data loss. Please tap 'Restore' instead to get your data back.");
-          }
-          return { success: false, error: 'Local data is empty, cloud has existing data. Restore recommended.' };
-        }
 
         // Create backup snapshot of existing cloud data before overwriting (if cloud had data)
         if (cloudHasData) {

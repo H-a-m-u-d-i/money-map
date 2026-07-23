@@ -192,18 +192,20 @@ export default function CategoryManager() {
         
         {/* Cloud Actions */}
         {useStore.getState().user && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-            <button 
-              onClick={async () => {
-                const res = await useStore.getState().syncToCloud();
-                if (res.success) alert("✅ Synced to Cloud!");
-                else alert("⚠️ Sync failed: " + res.error);
-              }} 
-              className="btn" 
-              style={{ background: 'var(--accent-primary)', color: 'white', fontSize: '13px', fontWeight: '700' }}
-            >
-              <RefreshCw size={18} /> Sync Cloud
-            </button>
+          <div style={{ display: 'grid', gridTemplateColumns: (useStore.getState().accounts.length > 0 || useStore.getState().transactions.length > 0) ? '1fr 1fr' : '1fr', gap: '12px', marginBottom: '12px' }}>
+            {(useStore.getState().accounts.length > 0 || useStore.getState().transactions.length > 0) && (
+              <button 
+                onClick={async () => {
+                  const res = await useStore.getState().syncToCloud();
+                  if (res.success) alert("✅ Synced to Cloud!");
+                  else alert("⚠️ Sync failed: " + res.error);
+                }} 
+                className="btn" 
+                style={{ background: 'var(--accent-primary)', color: 'white', fontSize: '13px', fontWeight: '700' }}
+              >
+                <RefreshCw size={18} /> Sync Cloud
+              </button>
+            )}
             <button 
               onClick={async () => {
                 if (window.confirm("Restore data from Cloud?")) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Wallet, PieChart, Activity, ShieldCheck, Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X, Key, Lock, LogOut, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Home, Wallet, PieChart, Activity, ShieldCheck, Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X, Key, Lock, LogOut, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
 import NewTransaction from './pages/NewTransaction';
@@ -106,19 +106,20 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
-  const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists } = useStore();
+  const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists, accounts, transactions } = useStore();
   
+  const hasLocalRecords = (accounts.length > 0 || transactions.length > 0);
+
   const [showSplash, setShowSplash] = React.useState(true);
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [syncing, setSyncing] = React.useState(false);
   const [mandatoryRestore, setMandatoryRestore] = React.useState(false);
-  const [resetConfirmInput, setResetConfirmInput] = React.useState('');
-  const [showResetConfirmBox, setShowResetConfirmBox] = React.useState(false);
   
   // Auth & Password Modal State
   const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
   const [isSignUp, setIsSignUp] = React.useState(false);
   const [authError, setAuthError] = React.useState('');
   const [authSuccess, setAuthSuccess] = React.useState('');
@@ -126,6 +127,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   // Password Change State
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [showNewPassword, setShowNewPassword] = React.useState(false);
   const [pwdMsg, setPwdMsg] = React.useState({ type: '', text: '' });
   const [changingPwd, setChangingPwd] = React.useState(false);
 
@@ -158,7 +160,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       }
     });
 
-    // 2. Listen for Network Changes (Auto-sync when online)
+    // 2. Listen for Network Changes (Auto-sync when online ONLY IF local has records)
     const handleOnline = async () => {
       setIsOnline(true);
       const state = useStore.getState();
@@ -182,10 +184,10 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     resetDateView();
     
     // Ensure Service Fees category exists
-    const categories = useStore.getState().categories;
-    if (!categories.find(c => c.id === 'cat_service_fees' || c.name === 'Service Fees')) {
+    const categoriesList = useStore.getState().categories;
+    if (!categoriesList.find(c => c.id === 'cat_service_fees' || c.name === 'Service Fees')) {
       const newCat = { id: 'cat_service_fees', name: 'Service Fees', type: 'expense', color: '#64748b', icon: 'zap' };
-      useStore.setState({ categories: [...categories, newCat] });
+      useStore.setState({ categories: [...categoriesList, newCat] });
     }
 
     let listener;
@@ -216,6 +218,10 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   }, [location.pathname, navigate, setShowExitConfirm, processRecurring, resetDateView, setUser]);
 
   const handleSync = async () => {
+    if (!hasLocalRecords) {
+      alert("Cannot Sync: Your device has 0 records. Please tap 'Restore' to load your data from Cloud.");
+      return;
+    }
     setSyncing(true);
     const res = await syncToCloud(false, false);
     setSyncing(false);
@@ -249,19 +255,6 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       setMandatoryRestore(false);
     } else {
       alert("⚠️ Recovery failed: " + (res.error || "Could not retrieve records from Cloud"));
-    }
-  };
-
-  const handleForceStartFresh = async () => {
-    if (resetConfirmInput.trim().toUpperCase() !== 'RESET') {
-      alert("Please type RESET in the box to confirm starting fresh.");
-      return;
-    }
-    if (window.confirm("FINAL WARNING: Starting fresh will clear your local state. Are you absolutely sure?")) {
-      useStore.setState({ accounts: [], transactions: [], loans: [], paydayDay: null, hasData: false });
-      setMandatoryRestore(false);
-      setShowResetConfirmBox(false);
-      alert("Started with empty workspace.");
     }
   };
 
@@ -352,27 +345,16 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
           <span style={{ fontSize: '9px', opacity: 0.7 }}>
             {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
           </span>
-          {user && (
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button 
-                onClick={handleSync} 
-                disabled={syncing}
-                title="Upload local records to Cloud"
-                style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
-              >
-                <RefreshCw size={10} className={syncing ? 'spin' : ''} />
-                <span>SYNC</span>
-              </button>
-              <button 
-                onClick={handleRestore} 
-                disabled={syncing}
-                title="Restore latest backup from Cloud"
-                style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
-              >
-                <CloudUpload size={10} />
-                <span>RESTORE</span>
-              </button>
-            </div>
+          {user && hasLocalRecords && (
+            <button 
+              onClick={handleSync} 
+              disabled={syncing}
+              title="Upload local records to Cloud"
+              style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+            >
+              <RefreshCw size={10} className={syncing ? 'spin' : ''} />
+              <span>SYNC</span>
+            </button>
           )}
         </div>
       </div>
@@ -401,10 +383,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                 </div>
 
                 {/* Cloud Sync & Restore Controls */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                  <button onClick={handleSync} disabled={syncing} className="btn" style={{ background: 'var(--accent-primary)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
-                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Now'}
-                  </button>
+                <div style={{ display: 'grid', gridTemplateColumns: hasLocalRecords ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: '20px' }}>
+                  {hasLocalRecords && (
+                    <button onClick={handleSync} disabled={syncing} className="btn" style={{ background: 'var(--accent-primary)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
+                      <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Now'}
+                    </button>
+                  )}
                   <button onClick={handleRestore} disabled={syncing} className="btn" style={{ background: 'var(--accent-success)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
                     <CloudUpload size={16} /> Restore Data
                   </button>
@@ -416,14 +400,43 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                     <Key size={14} color="var(--accent-primary)" /> Change Password
                   </h4>
                   <form onSubmit={handleChangePassword}>
-                    <input 
-                      type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6}
-                      style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px', fontSize: '12px' }}
-                    />
-                    <input 
-                      type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6}
-                      style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '10px', fontSize: '12px' }}
-                    />
+                    <div style={{ position: 'relative', marginBottom: '8px' }}>
+                      <input 
+                        type={showNewPassword ? "text" : "password"} 
+                        placeholder="New Password (min 6 chars)" 
+                        value={newPassword} 
+                        onChange={e => setNewPassword(e.target.value)} 
+                        required 
+                        minLength={6}
+                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                      >
+                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+
+                    <div style={{ position: 'relative', marginBottom: '10px' }}>
+                      <input 
+                        type={showNewPassword ? "text" : "password"} 
+                        placeholder="Confirm New Password" 
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        required 
+                        minLength={6}
+                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                      >
+                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
 
                     {pwdMsg.text && (
                       <p style={{ color: pwdMsg.type === 'error' ? 'var(--accent-danger)' : 'var(--accent-success)', fontSize: '11px', marginBottom: '10px', fontWeight: '600' }}>
@@ -447,16 +460,32 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                 </button>
               </div>
             ) : (
-              /* Login / Signup Form */
+              /* Login / Signup Form with Show/Hide Password Toggle */
               <form onSubmit={handleAuthSubmit}>
                 <input 
                   type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required
                   style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '12px' }}
                 />
-                <input 
-                  type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px' }}
-                />
+                
+                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Password" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    required 
+                    minLength={6}
+                    style={{ width: '100%', padding: '12px 40px 12px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
                 {authError && <p style={{ color: 'var(--accent-danger)', fontSize: '11px', marginBottom: '12px' }}>{authError}</p>}
                 
                 <button type="submit" style={{ width: '100%', padding: '12px', background: 'var(--accent-primary)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', marginTop: '8px' }}>
@@ -472,7 +501,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
         </div>
       )}
 
-      {/* Mandatory Data Loss Recovery Lockscreen (NO DISMISS BUTTON) */}
+      {/* Mandatory Data Loss Recovery Lockscreen (PURE MANDATORY RESTORE, NO BYPASS) */}
       {mandatoryRestore && user && (
         <div style={{
           position: 'fixed', inset: 0, background: '#0a0a0f',
@@ -492,7 +521,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
           </h2>
 
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', maxWidth: '340px', lineHeight: '1.5', marginBottom: '20px' }}>
-            Your device storage was cleared or reset (0 records found), but your existing financial history is safely stored in your Cloud Account (<strong>{user.email}</strong>).
+            Your device storage was reset (0 records found), but your financial history is safely stored in your Cloud Account (<strong>{user.email}</strong>).
           </p>
 
           <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '16px', borderRadius: '16px', width: '100%', maxWidth: '340px', marginBottom: '24px' }}>
@@ -500,7 +529,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
               🔒 Mandatory Protection
             </p>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
-              You must restore your records to access Money Map. This prevents overwriting your 2+ months of data.
+              You must restore your records to access Money Map. This prevents losing your 2+ months of financial records.
             </p>
           </div>
 
@@ -518,33 +547,6 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
             <CloudUpload size={22} />
             {syncing ? 'Restoring Data...' : 'RESTORE MY CLOUD DATA NOW'}
           </button>
-
-          {/* Emergency Bypass for Starting Fresh */}
-          {!showResetConfirmBox ? (
-            <button 
-              onClick={() => setShowResetConfirmBox(true)}
-              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '24px', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              Start Fresh with Empty Account (Deletes Cloud Backup)
-            </button>
-          ) : (
-            <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '14px', width: '100%', maxWidth: '340px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--accent-danger)', fontWeight: '800', marginBottom: '8px' }}>
-                ⚠️ TYPE 'RESET' TO CONFIRM STARTING FRESH
-              </p>
-              <input 
-                type="text" 
-                placeholder="Type RESET"
-                value={resetConfirmInput}
-                onChange={e => setResetConfirmInput(e.target.value)}
-                style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white', fontSize: '12px', textAlign: 'center', marginBottom: '8px' }}
-              />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setShowResetConfirmBox(false)} style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '11px' }}>Cancel</button>
-                <button onClick={handleForceStartFresh} style={{ flex: 1, padding: '8px', background: 'var(--accent-danger)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', fontSize: '11px' }}>Purge & Start Fresh</button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
