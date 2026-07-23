@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, signOut } from "firebase/auth";
+import { initializeFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -15,9 +15,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 
-// Utility functions for Cloud Sync
+// Use initializeFirestore with long polling fallback for native Android APK WebViews
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true
+});
+
+// Utility functions for Cloud Sync & Auth
 export const cloudSync = {
   // Save current store state to user's cloud document + create history snapshot
   saveData: async (userId, data) => {
@@ -39,10 +43,10 @@ export const cloudSync = {
           archivedAt: timestamp
         });
       }
-      return true;
+      return { success: true, timestamp };
     } catch (e) {
       console.error("Cloud Save Error:", e);
-      return false;
+      return { success: false, error: e.message || String(e) };
     }
   },
 
@@ -52,12 +56,12 @@ export const cloudSync = {
       const userDoc = doc(db, "users", userId);
       const docSnap = await getDoc(userDoc);
       if (docSnap.exists()) {
-        return docSnap.data();
+        return { success: true, data: docSnap.data() };
       }
-      return null;
+      return { success: true, data: null };
     } catch (e) {
       console.error("Cloud Fetch Error:", e);
-      return null;
+      return { success: false, error: e.message || String(e) };
     }
   },
 
@@ -82,7 +86,7 @@ export const cloudSync = {
     try {
       const allHistory = [];
 
-      // 1. Check 'history' subcollection (ordered by archivedAt or timestamp)
+      // 1. Check 'history' subcollection
       try {
         const historyRef = collection(db, "users", userId, "history");
         const querySnap = await getDocs(historyRef);
@@ -116,3 +120,26 @@ export const cloudSync = {
     }
   }
 };
+
+// Password management functions
+export const changeUserPassword = async (newPassword) => {
+  try {
+    if (!auth.currentUser) throw new Error("No user logged in");
+    await updatePassword(auth.currentUser, newPassword);
+    return { success: true };
+  } catch (e) {
+    console.error("Change Password Error:", e);
+    return { success: false, error: e.message.replace('Firebase: ', '') };
+  }
+};
+
+export const sendResetPasswordEmail = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true };
+  } catch (e) {
+    console.error("Reset Email Error:", e);
+    return { success: false, error: e.message.replace('Firebase: ', '') };
+  }
+};
+

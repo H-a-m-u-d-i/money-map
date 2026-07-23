@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { ChevronLeft, Plus, Trash2, Edit2, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Check, X, Download, Upload } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Edit2, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Check, X, Download, Upload, RefreshCw, CloudUpload } from 'lucide-react';
 
 const ICONS = [
   { id: 'pizza', icon: Pizza },
@@ -188,16 +188,47 @@ export default function CategoryManager() {
 
       <div className="glass-panel" style={{ padding: '24px', marginTop: '32px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Data Management</h3>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Export your data to a file for backup or sync it to another device.</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Export your data to a file for backup, restore from Cloud, or sync to another device.</p>
         
+        {/* Cloud Actions */}
+        {useStore.getState().user && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <button 
+              onClick={async () => {
+                const res = await useStore.getState().syncToCloud();
+                if (res.success) alert("✅ Synced to Cloud!");
+                else alert("⚠️ Sync failed: " + res.error);
+              }} 
+              className="btn" 
+              style={{ background: 'var(--accent-primary)', color: 'white', fontSize: '13px', fontWeight: '700' }}
+            >
+              <RefreshCw size={18} /> Sync Cloud
+            </button>
+            <button 
+              onClick={async () => {
+                if (window.confirm("Restore data from Cloud?")) {
+                  const res = await useStore.getState().pullFromCloud();
+                  if (res.success) { alert("🎉 Restored from Cloud!"); navigate('/'); }
+                  else alert("⚠️ Restore failed: " + res.error);
+                }
+              }} 
+              className="btn" 
+              style={{ background: 'var(--accent-success)', color: 'white', fontSize: '13px', fontWeight: '700' }}
+            >
+              <CloudUpload size={18} /> Restore Cloud
+            </button>
+          </div>
+        )}
+
+        {/* Local File Export / Import */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <button onClick={exportData} className="btn" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', fontSize: '13px' }}>
-            <Download size={18} /> Export
+            <Download size={18} /> Export File
           </button>
           
           <div style={{ position: 'relative' }}>
             <button className="btn" style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent-success)', fontSize: '13px' }}>
-              <Upload size={18} /> Import
+              <Upload size={18} /> Import File
             </button>
             <input 
               type="file" 

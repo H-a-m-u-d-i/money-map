@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Wallet, PieChart, Activity, ShieldCheck } from 'lucide-react';
+import { Home, Wallet, PieChart, Activity, ShieldCheck, Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X, Key, Lock, LogOut, CheckCircle2, ShieldAlert } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
 import NewTransaction from './pages/NewTransaction';
@@ -11,14 +11,11 @@ import RecurringManager from './pages/RecurringManager';
 import HealthScore from './pages/HealthScore';
 import SavingsSimulator from './pages/SavingsSimulator';
 import useStore from './store/useStore';
-import { Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X } from 'lucide-react';
-import { auth } from './lib/firebase';
+import { auth, changeUserPassword, sendResetPasswordEmail } from './lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 // Main tab routes — these replace history so they never stack
 const MAIN_TABS = ['/', '/wallets', '/loans', '/insights'];
-// Sub-pages — pressing back on these goes to home
-const SUB_PAGES = ['/new', '/settings/categories'];
 
 const BottomNav = () => {
   const location = useLocation();
@@ -40,7 +37,6 @@ const BottomNav = () => {
       paddingBottom: 'env(safe-area-inset-bottom)',
       zIndex: 1000
     }}>
-      {/* All tab links use 'replace' so they never push to browser history stack */}
       <NavItem to="/" replace icon={<Home size={24} />} active={location.pathname === '/'} label="Home" />
       <NavItem to="/wallets" replace icon={<Wallet size={24} />} active={location.pathname === '/wallets'} label="Wallets" />
       
@@ -103,7 +99,6 @@ const NavItem = ({ to, replace, icon, active, label }) => (
   </Link>
 );
 
-// Separate component so it has access to useLocation and useNavigate inside the Router
 function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -111,39 +106,72 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
-  const { user, setUser, syncToCloud, lastSynced, pullFromCloud } = useStore();
+  const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists } = useStore();
   
   const [showSplash, setShowSplash] = React.useState(true);
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [syncing, setSyncing] = React.useState(false);
-  const [showSyncPrompt, setShowSyncPrompt] = React.useState(false);
+  const [mandatoryRestore, setMandatoryRestore] = React.useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = React.useState('');
+  const [showResetConfirmBox, setShowResetConfirmBox] = React.useState(false);
   
-  // Auth Modal State
+  // Auth & Password Modal State
   const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isSignUp, setIsSignUp] = React.useState(false);
   const [authError, setAuthError] = React.useState('');
+  const [authSuccess, setAuthSuccess] = React.useState('');
+
+  // Password Change State
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [pwdMsg, setPwdMsg] = React.useState({ type: '', text: '' });
+  const [changingPwd, setChangingPwd] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
+  // Check if mandatory data recovery is required
+  const verifyDataIntegrity = async (firebaseUser) => {
+    if (!firebaseUser) return;
+    const store = useStore.getState();
+    const localIsEmpty = store.accounts.length === 0 && store.transactions.length === 0;
+
+    if (localIsEmpty) {
+      const cloudHasData = await checkCloudDataExists();
+      if (cloudHasData) {
+        console.warn("MANDATORY RESTORE: Local storage is empty (0.0), but Cloud has data. Blocking UI.");
+        setMandatoryRestore(true);
+      }
+    }
+  };
+
   useEffect(() => {
     // 1. Listen for Auth Changes
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      // If user just logged in and we have no local data, suggest a pull
-      if (firebaseUser && useStore.getState().accounts.length === 0) {
-        setShowSyncPrompt(true);
+      if (firebaseUser) {
+        await verifyDataIntegrity(firebaseUser);
       }
     });
 
-    // 2. Listen for Network Changes
-    const handleOnline = () => {
+    // 2. Listen for Network Changes (Auto-sync when online)
+    const handleOnline = async () => {
       setIsOnline(true);
-      if (useStore.getState().user) setShowSyncPrompt(true);
+      const state = useStore.getState();
+      if (state.user) {
+        if (state.accounts.length === 0 && state.transactions.length === 0) {
+          await verifyDataIntegrity(state.user);
+        } else {
+          console.log("Internet Connected! Auto-syncing to Cloud...");
+          setSyncing(true);
+          await syncToCloud(false, true); // silent auto-sync
+          setSyncing(false);
+        }
+      }
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -166,22 +194,18 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
         const { App: CapApp } = await import('@capacitor/app');
         listener = await CapApp.addListener('backButton', () => {
           const path = location.pathname;
-          
           if (MAIN_TABS.includes(path)) {
-            // On a main tab → show exit confirmation
             setShowExitConfirm(true);
             if (exitTimeout.current) clearTimeout(exitTimeout.current);
             exitTimeout.current = setTimeout(() => setShowExitConfirm(false), 3000);
           } else {
-            // On a sub-page → go home (replace so it doesn't stack)
             navigate('/', { replace: true });
           }
         });
-      } catch (e) {
-        // Not running in Capacitor — skip
-      }
+      } catch (e) {}
     };
     setupBackButton();
+
     return () => {
       unsubscribeAuth();
       window.removeEventListener('online', handleOnline);
@@ -193,29 +217,62 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const handleSync = async () => {
     setSyncing(true);
-    const success = await syncToCloud();
+    const res = await syncToCloud(false, false);
     setSyncing(false);
-    if (success) setShowSyncPrompt(false);
+    if (res.success) {
+      alert("✅ Data Synced to Cloud successfully!");
+    } else if (res.error) {
+      alert("⚠️ Sync Failed: " + res.error);
+    }
   };
 
   const handleRestore = async () => {
-    if (window.confirm("Restore data from cloud? This will overwrite your current local data.")) {
+    if (window.confirm("Restore data from Cloud? This will download your latest cloud backup to this device.")) {
       setSyncing(true);
-      const success = await pullFromCloud();
+      const res = await pullFromCloud();
       setSyncing(false);
-      if (success) {
-        alert("Data restored successfully!");
-        setShowSyncPrompt(false);
+      if (res.success) {
+        alert("🎉 Data Restored Successfully!");
+        setMandatoryRestore(false);
+      } else {
+        alert("⚠️ Restore Failed: " + (res.error || "No data found in Cloud"));
       }
+    }
+  };
+
+  const handleMandatoryRestoreAction = async () => {
+    setSyncing(true);
+    const res = await pullFromCloud();
+    setSyncing(false);
+    if (res.success) {
+      alert("🎉 Your records have been fully restored!");
+      setMandatoryRestore(false);
+    } else {
+      alert("⚠️ Recovery failed: " + (res.error || "Could not retrieve records from Cloud"));
+    }
+  };
+
+  const handleForceStartFresh = async () => {
+    if (resetConfirmInput.trim().toUpperCase() !== 'RESET') {
+      alert("Please type RESET in the box to confirm starting fresh.");
+      return;
+    }
+    if (window.confirm("FINAL WARNING: Starting fresh will clear your local state. Are you absolutely sure?")) {
+      useStore.setState({ accounts: [], transactions: [], loans: [], paydayDay: null, hasData: false });
+      setMandatoryRestore(false);
+      setShowResetConfirmBox(false);
+      alert("Started with empty workspace.");
     }
   };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
+    setAuthSuccess('');
     try {
       if (isSignUp) {
         await createUserWithEmailAndPassword(auth, email, password);
+        setAuthSuccess("Account created successfully!");
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
@@ -226,9 +283,44 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwdMsg({ type: '', text: '' });
+    if (!newPassword || newPassword.length < 6) {
+      setPwdMsg({ type: 'error', text: 'Password must be at least 6 characters long.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdMsg({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+    setChangingPwd(true);
+    const res = await changeUserPassword(newPassword);
+    setChangingPwd(false);
+    if (res.success) {
+      setPwdMsg({ type: 'success', text: 'Password updated successfully!' });
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      setPwdMsg({ type: 'error', text: res.error || 'Failed to update password. Try logging in again.' });
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!user || !user.email) return;
+    setPwdMsg({ type: '', text: '' });
+    const res = await sendResetPasswordEmail(user.email);
+    if (res.success) {
+      setPwdMsg({ type: 'success', text: `Password reset email sent to ${user.email}` });
+    } else {
+      setPwdMsg({ type: 'error', text: res.error || 'Failed to send reset email.' });
+    }
+  };
+
   const handleLogout = () => {
-    if(window.confirm("Sign out of Cloud Sync?")) {
+    if (window.confirm("Sign out of Cloud Sync?")) {
       signOut(auth);
+      setShowLoginModal(false);
     }
   };
 
@@ -237,130 +329,223 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       {/* Cloud Status Header Bar */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '40px',
-        background: 'rgba(10, 10, 15, 0.4)', backdropFilter: 'blur(10px)',
+        background: 'rgba(10, 10, 15, 0.6)', backdropFilter: 'blur(10px)',
         zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px', fontSize: '10px', color: 'rgba(255,255,255,0.4)',
+        padding: '0 16px', fontSize: '10px', color: 'rgba(255,255,255,0.6)',
         fontWeight: '600', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {user ? (
-            <div onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-success)', cursor: 'pointer' }}>
-              <Cloud size={12} />
+            <div onClick={() => setShowLoginModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-success)', cursor: 'pointer' }}>
+              <Cloud size={13} />
               <span>CLOUD ACTIVE</span>
             </div>
           ) : (
             <div onClick={() => setShowLoginModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-              <CloudOff size={12} />
-              <span>GUEST MODE (TAP TO LOGIN)</span>
+              <CloudOff size={13} />
+              <span>GUEST MODE (LOGIN)</span>
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '9px', opacity: 0.7 }}>
+            {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
+          </span>
           {user && (
-            <button 
-              onClick={handleSync} 
-              disabled={syncing}
-              style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800' }}
-            >
-              {syncing ? '...' : 'SYNC'}
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button 
+                onClick={handleSync} 
+                disabled={syncing}
+                title="Upload local records to Cloud"
+                style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+              >
+                <RefreshCw size={10} className={syncing ? 'spin' : ''} />
+                <span>SYNC</span>
+              </button>
+              <button 
+                onClick={handleRestore} 
+                disabled={syncing}
+                title="Restore latest backup from Cloud"
+                style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+              >
+                <CloudUpload size={10} />
+                <span>RESTORE</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Auth Modal */}
+      {/* Auth & Password Modal */}
       {showLoginModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
           zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
         }}>
-          <div style={{ background: 'var(--bg-surface-elevated)', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '350px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '800' }}>{isSignUp ? 'Create Cloud Account' : 'Cloud Login'}</h2>
-              <X size={24} onClick={() => setShowLoginModal(false)} style={{ color: 'var(--text-secondary)' }} />
+          <div style={{ background: 'var(--bg-surface-elevated)', padding: '24px', borderRadius: '20px', width: '100%', maxWidth: '380px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={20} color="var(--accent-primary)" />
+                {user ? 'Cloud Account Settings' : (isSignUp ? 'Create Cloud Account' : 'Cloud Login')}
+              </h2>
+              <X size={22} onClick={() => setShowLoginModal(false)} style={{ color: 'var(--text-secondary)', cursor: 'pointer' }} />
             </div>
-            
-            <form onSubmit={handleAuthSubmit}>
-              <input 
-                type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required
-                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '12px' }}
-              />
-              <input 
-                type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
-                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px' }}
-              />
-              {authError && <p style={{ color: 'var(--accent-danger)', fontSize: '11px', marginBottom: '12px' }}>{authError}</p>}
-              
-              <button type="submit" style={{ width: '100%', padding: '12px', background: 'var(--accent-primary)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', marginTop: '8px' }}>
-                {isSignUp ? 'Sign Up' : 'Login'}
-              </button>
-            </form>
-            
-            <p onClick={() => setIsSignUp(!isSignUp)} style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '16px', cursor: 'pointer' }}>
-              {isSignUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
-            </p>
+
+            {user ? (
+              /* Account Actions & Change Password */
+              <div>
+                <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', marginBottom: '16px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--accent-success)', fontWeight: '700' }}>CONNECTED ACCOUNT</p>
+                  <p style={{ fontSize: '14px', fontWeight: '800', marginTop: '2px', wordBreak: 'break-all' }}>{user.email}</p>
+                </div>
+
+                {/* Cloud Sync & Restore Controls */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                  <button onClick={handleSync} disabled={syncing} className="btn" style={{ background: 'var(--accent-primary)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
+                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                  <button onClick={handleRestore} disabled={syncing} className="btn" style={{ background: 'var(--accent-success)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
+                    <CloudUpload size={16} /> Restore Data
+                  </button>
+                </div>
+
+                {/* Change Password Section */}
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key size={14} color="var(--accent-primary)" /> Change Password
+                  </h4>
+                  <form onSubmit={handleChangePassword}>
+                    <input 
+                      type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6}
+                      style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px', fontSize: '12px' }}
+                    />
+                    <input 
+                      type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6}
+                      style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '10px', fontSize: '12px' }}
+                    />
+
+                    {pwdMsg.text && (
+                      <p style={{ color: pwdMsg.type === 'error' ? 'var(--accent-danger)' : 'var(--accent-success)', fontSize: '11px', marginBottom: '10px', fontWeight: '600' }}>
+                        {pwdMsg.text}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="submit" disabled={changingPwd} className="btn" style={{ flex: 1, background: 'var(--accent-primary)', color: 'white', padding: '10px', fontSize: '12px', fontWeight: '800' }}>
+                        {changingPwd ? 'Updating...' : 'Update Password'}
+                      </button>
+                      <button type="button" onClick={handleSendResetEmail} className="btn" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', padding: '10px', fontSize: '11px' }}>
+                        Reset Email
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <button onClick={handleLogout} className="btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--accent-danger)', padding: '12px', fontWeight: '800', fontSize: '13px' }}>
+                  <LogOut size={16} /> Sign Out
+                </button>
+              </div>
+            ) : (
+              /* Login / Signup Form */
+              <form onSubmit={handleAuthSubmit}>
+                <input 
+                  type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '12px' }}
+                />
+                <input 
+                  type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '8px' }}
+                />
+                {authError && <p style={{ color: 'var(--accent-danger)', fontSize: '11px', marginBottom: '12px' }}>{authError}</p>}
+                
+                <button type="submit" style={{ width: '100%', padding: '12px', background: 'var(--accent-primary)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', marginTop: '8px' }}>
+                  {isSignUp ? 'Create Cloud Account' : 'Login'}
+                </button>
+
+                <p onClick={() => setIsSignUp(!isSignUp)} style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '16px', cursor: 'pointer' }}>
+                  {isSignUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
+                </p>
+              </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* Sync / Restore Prompt Banners */}
-      {showSyncPrompt && isOnline && user && (
-        useStore.getState().accounts.length === 0 && useStore.getState().transactions.length === 0 ? (
-          /* Restore Prompt (when device is empty) */
+      {/* Mandatory Data Loss Recovery Lockscreen (NO DISMISS BUTTON) */}
+      {mandatoryRestore && user && (
+        <div style={{
+          position: 'fixed', inset: 0, background: '#0a0a0f',
+          zIndex: 20000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '24px', textAlign: 'center'
+        }}>
           <div style={{
-            position: 'fixed', top: '50px', left: '20px', right: '20px',
-            background: 'var(--accent-success)', color: 'white', borderRadius: '16px',
-            padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.15)',
+            border: '2px solid var(--accent-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--accent-danger)', marginBottom: '20px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <CloudUpload size={24} />
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Restore Available</p>
-                <p style={{ fontSize: '11px', opacity: 0.9 }}>Local device is empty. Restore your cloud records?</p>
+            <ShieldAlert size={42} />
+          </div>
+
+          <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'white', marginBottom: '10px' }}>
+            Data Recovery Required
+          </h2>
+
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', maxWidth: '340px', lineHeight: '1.5', marginBottom: '20px' }}>
+            Your device storage was cleared or reset (0 records found), but your existing financial history is safely stored in your Cloud Account (<strong>{user.email}</strong>).
+          </p>
+
+          <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '16px', borderRadius: '16px', width: '100%', maxWidth: '340px', marginBottom: '24px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--accent-success)', fontWeight: '800' }}>
+              🔒 Mandatory Protection
+            </p>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
+              You must restore your records to access Money Map. This prevents overwriting your 2+ months of data.
+            </p>
+          </div>
+
+          <button 
+            onClick={handleMandatoryRestoreAction}
+            disabled={syncing}
+            style={{
+              width: '100%', maxWidth: '340px', padding: '16px',
+              background: 'var(--accent-success)', color: 'white', border: 'none',
+              borderRadius: '14px', fontSize: '15px', fontWeight: '900',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)', cursor: 'pointer'
+            }}
+          >
+            <CloudUpload size={22} />
+            {syncing ? 'Restoring Data...' : 'RESTORE MY CLOUD DATA NOW'}
+          </button>
+
+          {/* Emergency Bypass for Starting Fresh */}
+          {!showResetConfirmBox ? (
+            <button 
+              onClick={() => setShowResetConfirmBox(true)}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '24px', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Start Fresh with Empty Account (Deletes Cloud Backup)
+            </button>
+          ) : (
+            <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '14px', width: '100%', maxWidth: '340px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--accent-danger)', fontWeight: '800', marginBottom: '8px' }}>
+                ⚠️ TYPE 'RESET' TO CONFIRM STARTING FRESH
+              </p>
+              <input 
+                type="text" 
+                placeholder="Type RESET"
+                value={resetConfirmInput}
+                onChange={e => setResetConfirmInput(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white', fontSize: '12px', textAlign: 'center', marginBottom: '8px' }}
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowResetConfirmBox(false)} style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '11px' }}>Cancel</button>
+                <button onClick={handleForceStartFresh} style={{ flex: 1, padding: '8px', background: 'var(--accent-danger)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '800', fontSize: '11px' }}>Purge & Start Fresh</button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
-              <button 
-                onClick={handleRestore} 
-                disabled={syncing}
-                style={{ background: 'white', color: 'var(--accent-success)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
-              >
-                {syncing ? 'Restoring...' : 'Restore Data'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Sync Prompt (when device has non-empty local data) */
-          <div style={{
-            position: 'fixed', top: '50px', left: '20px', right: '20px',
-            background: 'var(--accent-primary)', color: 'white', borderRadius: '16px',
-            padding: '16px', zIndex: 1100, display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            animation: 'slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <RefreshCw size={24} className={syncing ? 'spin' : ''} />
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '800' }}>Cloud Sync Available</p>
-                <p style={{ fontSize: '11px', opacity: 0.8 }}>Backup your latest local data to Cloud.</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowSyncPrompt(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', padding: '8px' }}>Dismiss</button>
-              <button 
-                onClick={handleSync} 
-                disabled={syncing}
-                style={{ background: 'white', color: 'var(--accent-primary)', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
-              >
-                {syncing ? 'Syncing...' : 'Sync Now'}
-              </button>
-            </div>
-          </div>
-        )
+          )}
+        </div>
       )}
 
       {showSplash && (
