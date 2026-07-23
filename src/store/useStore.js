@@ -65,6 +65,12 @@ const MONEFY_CATEGORIES = [
   { id: 'cat_savings', name: 'Savings', type: 'income', color: '#3b82f6', icon: 'briefcase' }
 ];
 
+// Module-level hydration tracker — NOT persisted to localforage.
+// Resolves once Zustand has finished loading data from IndexedDB.
+let _hydrateResolve;
+export const hydrationReady = new Promise(resolve => { _hydrateResolve = resolve; });
+export const waitForHydration = () => hydrationReady;
+
 const useStore = create(
   persist(
     (set, get) => ({
@@ -80,7 +86,6 @@ const useStore = create(
       hasData: false, // Safety flag to detect if the app was ever used
       user: null, // Firebase user object
       lastSynced: null,
-      _hasHydrated: false, // True once localforage has finished loading persisted data
 
       setPaydayDay: (day) => set({ paydayDay: day }),
 
@@ -693,10 +698,9 @@ const useStore = create(
               state.hasData = true;
             }
           }
-          // CRITICAL: Mark hydration complete so App.jsx knows local storage has been fully loaded
-          // Without this flag, verifyDataIntegrity runs BEFORE localforage loads data and
-          // falsely shows the mandatory restore screen on every web refresh.
-          useStore.setState({ _hasHydrated: true });
+          // Resolve the module-level hydration promise so waitForHydration() callers unblock.
+          // This is NEVER stored in localforage — it resets fresh on every page load.
+          _hydrateResolve();
         };
       },
     }
