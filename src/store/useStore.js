@@ -11,36 +11,76 @@ localforage.config({
   driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE] // Ensure all drivers are checked
 });
 
-// Custom storage wrapper for Zustand to use localforage
+// Custom storage wrapper for Zustand to use localforage with fallback to localStorage
 const localForageStore = {
   getItem: async (name) => {
     try {
-      const value = await localforage.getItem(name);
-      if (value) return value;
+      let value = await localforage.getItem(name);
+      if (value !== null && value !== undefined) {
+        return typeof value === 'string' ? value : JSON.stringify(value);
+      }
       
-      // DEEP SCAN: If primary key is empty, check common alternatives
+      // Fallback: Check window.localStorage directly
+      try {
+        const lsValue = localStorage.getItem(name);
+        if (lsValue !== null && lsValue !== undefined) {
+          console.warn("Recovered store data from localStorage fallback:", name);
+          const stringVal = typeof lsValue === 'string' ? lsValue : JSON.stringify(lsValue);
+          await localforage.setItem(name, stringVal);
+          return stringVal;
+        }
+      } catch (e) {}
+
+      // Deep scan alternative keys in both localforage and localStorage
       const alternatives = ['money-map-storage', 'moneymap', 'money_map', 'moneyMapStore'];
       for (const alt of alternatives) {
         if (alt === name) continue;
-        const altValue = await localforage.getItem(alt);
-        if (altValue) {
-          console.warn("DEEP SCAN: Found data in alternative key:", alt);
-          return altValue;
+        let altValue = await localforage.getItem(alt);
+        if (altValue !== null && altValue !== undefined) {
+          console.warn("DEEP SCAN: Found data in alternative localforage key:", alt);
+          return typeof altValue === 'string' ? altValue : JSON.stringify(altValue);
         }
+        try {
+          const lsAlt = localStorage.getItem(alt);
+          if (lsAlt !== null && lsAlt !== undefined) {
+            console.warn("DEEP SCAN: Found data in alternative localStorage key:", alt);
+            return typeof lsAlt === 'string' ? lsAlt : JSON.stringify(lsAlt);
+          }
+        } catch (e) {}
       }
       return null;
     } catch (e) {
-      console.error("Storage Error:", e);
+      console.error("localForageStore.getItem error:", e);
+      try {
+        const lsVal = localStorage.getItem(name);
+        if (lsVal !== null) return typeof lsVal === 'string' ? lsVal : JSON.stringify(lsVal);
+      } catch (err) {}
       return null;
     }
   },
   setItem: async (name, value) => {
-    await localforage.setItem(name, value);
+    const stringVal = typeof value === 'string' ? value : JSON.stringify(value);
+    try {
+      await localforage.setItem(name, stringVal);
+    } catch (e) {
+      console.error("localforage setItem error:", e);
+    }
+    try {
+      localStorage.setItem(name, stringVal);
+    } catch (e) {
+      console.error("localStorage setItem error:", e);
+    }
   },
   removeItem: async (name) => {
-    await localforage.removeItem(name);
+    try {
+      await localforage.removeItem(name);
+    } catch (e) {}
+    try {
+      localStorage.removeItem(name);
+    } catch (e) {}
   },
 };
+
 
 const MONEFY_CATEGORIES = [
   // Expenses

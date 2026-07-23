@@ -137,15 +137,14 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check if mandatory data recovery is needed.
-  // ALWAYS waits for localforage hydration to complete first — this prevents
-  // false positives on page refresh where IndexedDB hasn't loaded yet.
-  // Returns true if mandatory restore was triggered, false otherwise.
+  // Check if mandatory data recovery is needed (Option A).
+  // ALWAYS waits for localforage/localStorage hydration to complete first.
+  // If local is genuinely 0 records but Cloud has data, displays the Mandatory Restore Lockscreen.
+  // Returns true if mandatory restore screen was shown, false otherwise.
   const verifyDataIntegrity = async (firebaseUser) => {
     if (!firebaseUser) return false;
 
-    // Wait until Zustand has finished loading persisted data from IndexedDB.
-    // waitForHydration() resolves as soon as onRehydrateStorage fires.
+    // Wait until Zustand has finished loading persisted data from IndexedDB / localStorage.
     await waitForHydration();
 
     const store = useStore.getState();
@@ -154,11 +153,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     if (localIsEmpty) {
       const cloudHasData = await checkCloudDataExists();
       if (cloudHasData) {
-        console.warn("MANDATORY RESTORE: Local storage is truly empty (0 records), Cloud has data.");
+        console.warn("MANDATORY RESTORE REQUIRED: Local storage has 0 records, Cloud has data. Showing lockscreen.");
         setMandatoryRestore(true);
         return true;
       }
     }
+    setMandatoryRestore(false);
     return false;
   };
 
