@@ -158,14 +158,15 @@ export default function Wallets() {
                 <div style={{ 
                   width: '40px', height: '40px', 
                   borderRadius: '12px', 
-                  background: 'rgba(255,255,255,0.03)',
+                  background: 'var(--bg-glass-subtle)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: acc.color
                 }}>
                   {acc.type === 'bank' ? <Landmark size={20} /> : <Coins size={20} />}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: '700' }}>{acc.name}</h3>
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{acc.name}</h3>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>{acc.type}</p>
                 </div>
               </div>

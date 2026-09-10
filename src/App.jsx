@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Wallet, PieChart, Activity, ShieldCheck, Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X, Key, Lock, LogOut, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { Home, Wallet, PieChart, Activity, ShieldCheck, Cloud, CloudOff, CloudUpload, AlertCircle, RefreshCw, X, Key, Lock, LogOut, CheckCircle2, ShieldAlert, Eye, EyeOff, Sun, Moon } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
 import NewTransaction from './pages/NewTransaction';
@@ -27,10 +27,10 @@ const BottomNav = () => {
       left: 0,
       right: 0,
       height: '70px',
-      background: 'rgba(30, 30, 36, 0.8)',
+      background: 'var(--nav-bg)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+      borderTop: '1px solid var(--border-color)',
       display: 'flex',
       justifyContent: 'space-around',
       alignItems: 'center',
@@ -43,7 +43,7 @@ const BottomNav = () => {
       {/* Split Entry Buttons */}
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', transform: 'translateY(-10px)' }}>
         <Link to="/new?mode=expense" style={{
-          background: 'rgba(239, 68, 68, 0.2)',
+          background: 'rgba(239, 68, 68, 0.15)',
           border: '2px solid var(--accent-danger)',
           borderRadius: '50%',
           width: '50px',
@@ -59,7 +59,7 @@ const BottomNav = () => {
           -
         </Link>
         <Link to="/new?mode=income" style={{
-          background: 'rgba(16, 185, 129, 0.2)',
+          background: 'rgba(16, 185, 129, 0.15)',
           border: '2px solid var(--accent-success)',
           borderRadius: '50%',
           width: '50px',
@@ -106,7 +106,11 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   const processRecurring = useStore(state => state.processRecurring);
   const resetDateView = useStore(state => state.resetDateView);
-  const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists, accounts, transactions } = useStore();
+  const { user, setUser, syncToCloud, lastSynced, pullFromCloud, checkCloudDataExists, accounts, transactions, theme, toggleTheme } = useStore();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme || 'light');
+  }, [theme]);
 
   // SYNC button only visible when there are real local records
   const hasLocalRecords = (accounts.length > 0 || transactions.length > 0);
@@ -164,6 +168,8 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
   // Auto-sync: called on page load after auth resolves, and on network reconnect.
   // Only syncs if local records exist. If local is empty, checks for mandatory restore instead.
+  // Auto-sync: called on page load after auth resolves, and on network reconnect.
+  // Only syncs if local records exist. If local is empty, checks for mandatory restore instead.
   const doAutoSync = async (firebaseUser) => {
     await waitForHydration();
     const state = useStore.getState();
@@ -175,8 +181,13 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     } else if (navigator.onLine) {
       console.log("Auto-syncing to Cloud...");
       setSyncing(true);
-      await state.syncToCloud(false, true); // silent
-      setSyncing(false);
+      try {
+        await state.syncToCloud(false, true); // silent
+      } catch (e) {
+        console.error("doAutoSync error:", e);
+      } finally {
+        setSyncing(false);
+      }
     }
   };
 
@@ -225,6 +236,35 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
     };
     setupCapacitorNetwork();
 
+    // 4. Record Mutations Subscriber: Debounced silent auto-sync (2.5s after data changes)
+    let autoSyncTimer = null;
+    const unsubscribeStore = useStore.subscribe((state, prevState) => {
+      if (!state.user || !navigator.onLine) return;
+      const hasRecords = state.accounts.length > 0 || state.transactions.length > 0;
+      if (!hasRecords) return;
+
+      if (
+        state.transactions !== prevState.transactions ||
+        state.accounts !== prevState.accounts ||
+        state.loans !== prevState.loans ||
+        state.categories !== prevState.categories ||
+        state.recurring !== prevState.recurring
+      ) {
+        if (autoSyncTimer) clearTimeout(autoSyncTimer);
+        autoSyncTimer = setTimeout(async () => {
+          console.log("Data change detected. Executing silent auto-sync...");
+          setSyncing(true);
+          try {
+            await state.syncToCloud(false, true);
+          } catch (e) {
+            console.error("Debounced silent sync error:", e);
+          } finally {
+            setSyncing(false);
+          }
+        }, 2500);
+      }
+    });
+
     processRecurring();
     resetDateView();
 
@@ -258,6 +298,8 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       if (capNetworkListener) capNetworkListener.remove();
+      if (unsubscribeStore) unsubscribeStore();
+      if (autoSyncTimer) clearTimeout(autoSyncTimer);
       if (listener) listener.remove();
       if (exitTimeout.current) clearTimeout(exitTimeout.current);
     };
@@ -269,38 +311,53 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       return;
     }
     setSyncing(true);
-    const res = await syncToCloud(false, false);
-    setSyncing(false);
-    if (res.success) {
-      alert("✅ Data Synced to Cloud successfully!");
-    } else if (res.error) {
-      alert("⚠️ Sync Failed: " + res.error);
+    try {
+      const res = await syncToCloud(false, false);
+      if (res.success) {
+        alert("✅ Data Synced to Cloud successfully!");
+      } else if (res.error) {
+        alert("⚠️ Sync Failed: " + res.error);
+      }
+    } catch (e) {
+      alert("⚠️ Sync Failed: " + (e.message || String(e)));
+    } finally {
+      setSyncing(false);
     }
   };
 
   const handleRestore = async () => {
     if (window.confirm("Restore data from Cloud? This will download your latest cloud backup to this device.")) {
       setSyncing(true);
-      const res = await pullFromCloud();
-      setSyncing(false);
-      if (res.success) {
-        alert("🎉 Data Restored Successfully!");
-        setMandatoryRestore(false);
-      } else {
-        alert("⚠️ Restore Failed: " + (res.error || "No data found in Cloud"));
+      try {
+        const res = await pullFromCloud();
+        if (res.success) {
+          alert("🎉 Data Restored Successfully!");
+          setMandatoryRestore(false);
+        } else {
+          alert("⚠️ Restore Failed: " + (res.error || "No data found in Cloud"));
+        }
+      } catch (e) {
+        alert("⚠️ Restore Failed: " + (e.message || String(e)));
+      } finally {
+        setSyncing(false);
       }
     }
   };
 
   const handleMandatoryRestoreAction = async () => {
     setSyncing(true);
-    const res = await pullFromCloud();
-    setSyncing(false);
-    if (res.success) {
-      alert("🎉 Your records have been fully restored!");
-      setMandatoryRestore(false);
-    } else {
-      alert("⚠️ Recovery failed: " + (res.error || "Could not retrieve records from Cloud"));
+    try {
+      const res = await pullFromCloud();
+      if (res.success) {
+        alert("🎉 Your records have been fully restored!");
+        setMandatoryRestore(false);
+      } else {
+        alert("⚠️ Recovery failed: " + (res.error || "Could not retrieve records from Cloud"));
+      }
+    } catch (e) {
+      alert("⚠️ Recovery failed: " + (e.message || String(e)));
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -368,10 +425,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       {/* Cloud Status Header Bar */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '40px',
-        background: 'rgba(10, 10, 15, 0.6)', backdropFilter: 'blur(10px)',
+        background: 'var(--header-bg)', backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', fontSize: '10px', color: 'rgba(255,255,255,0.6)',
-        fontWeight: '600', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)'
+        padding: '0 16px', fontSize: '10px', color: 'var(--text-secondary)',
+        fontWeight: '600', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {user ? (
@@ -387,8 +446,8 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '9px', opacity: 0.7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '9px', opacity: 0.85 }}>
             {lastSynced ? `LAST SYNC: ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NOT SYNCED'}
           </span>
           {user && hasLocalRecords && (
@@ -396,24 +455,38 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
               onClick={handleSync} 
               disabled={syncing}
               title="Upload local records to Cloud"
-              style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+              style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
             >
               <RefreshCw size={10} className={syncing ? 'spin' : ''} />
               <span>SYNC</span>
             </button>
           )}
+          {/* Theme Toggle Button */}
+          <button 
+            onClick={toggleTheme}
+            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            style={{
+              background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              color: 'var(--text-primary)', border: '1px solid var(--border-color)',
+              borderRadius: '6px', padding: '4px 8px', fontSize: '9px', fontWeight: '800',
+              display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'
+            }}
+          >
+            {theme === 'dark' ? <Sun size={11} color="#f59e0b" /> : <Moon size={11} color="#4f46e5" />}
+            <span>{theme === 'dark' ? 'LIGHT' : 'DARK'}</span>
+          </button>
         </div>
       </div>
 
       {/* Auth & Password Modal */}
       {showLoginModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
           zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
         }}>
-          <div style={{ background: 'var(--bg-surface-elevated)', padding: '24px', borderRadius: '20px', width: '100%', maxWidth: '380px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--modal-bg)', color: 'var(--text-primary)', padding: '24px', borderRadius: '20px', width: '100%', maxWidth: '380px', border: '1px solid var(--border-color)', boxShadow: 'var(--card-shadow)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
                 <ShieldCheck size={20} color="var(--accent-primary)" />
                 {user ? 'Cloud Account Settings' : (isSignUp ? 'Create Cloud Account' : 'Cloud Login')}
               </h2>
@@ -425,24 +498,24 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
               <div>
                 <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', marginBottom: '16px' }}>
                   <p style={{ fontSize: '11px', color: 'var(--accent-success)', fontWeight: '700' }}>CONNECTED ACCOUNT</p>
-                  <p style={{ fontSize: '14px', fontWeight: '800', marginTop: '2px', wordBreak: 'break-all' }}>{user.email}</p>
+                  <p style={{ fontSize: '14px', fontWeight: '800', marginTop: '2px', wordBreak: 'break-all', color: 'var(--text-primary)' }}>{user.email}</p>
                 </div>
 
                 {/* Cloud Sync & Restore Controls */}
                 <div style={{ display: 'grid', gridTemplateColumns: hasLocalRecords ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: '20px' }}>
                   {hasLocalRecords && (
-                    <button onClick={handleSync} disabled={syncing} className="btn" style={{ background: 'var(--accent-primary)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
+                    <button onClick={handleSync} disabled={syncing} className="btn" style={{ background: 'var(--accent-primary)', color: 'white', border: 'none', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
                       <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Now'}
                     </button>
                   )}
-                  <button onClick={handleRestore} disabled={syncing} className="btn" style={{ background: 'var(--accent-success)', color: 'white', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
+                  <button onClick={handleRestore} disabled={syncing} className="btn" style={{ background: 'var(--accent-success)', color: 'white', border: 'none', padding: '12px', fontSize: '13px', fontWeight: '800' }}>
                     <CloudUpload size={16} /> Restore Data
                   </button>
                 </div>
 
                 {/* Change Password Section */}
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ padding: '16px', background: 'var(--modal-input-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
                     <Key size={14} color="var(--accent-primary)" /> Change Password
                   </h4>
                   <form onSubmit={handleChangePassword}>
@@ -454,12 +527,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                         onChange={e => setNewPassword(e.target.value)} 
                         required 
                         minLength={6}
-                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '12px' }}
                       />
                       <button 
                         type="button" 
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
                       >
                         {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -473,12 +546,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                         onChange={e => setConfirmPassword(e.target.value)} 
                         required 
                         minLength={6}
-                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+                        style={{ width: '100%', padding: '10px 36px 10px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '12px' }}
                       />
                       <button 
                         type="button" 
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
                       >
                         {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -491,17 +564,17 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                     )}
 
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button type="submit" disabled={changingPwd} className="btn" style={{ flex: 1, background: 'var(--accent-primary)', color: 'white', padding: '10px', fontSize: '12px', fontWeight: '800' }}>
+                      <button type="submit" disabled={changingPwd} className="btn" style={{ flex: 1, background: 'var(--accent-primary)', color: 'white', border: 'none', padding: '10px', fontSize: '12px', fontWeight: '800' }}>
                         {changingPwd ? 'Updating...' : 'Update Password'}
                       </button>
-                      <button type="button" onClick={handleSendResetEmail} className="btn" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', padding: '10px', fontSize: '11px' }}>
+                      <button type="button" onClick={handleSendResetEmail} className="btn" style={{ background: 'var(--bg-surface-elevated)', color: 'var(--text-secondary)', padding: '10px', fontSize: '11px' }}>
                         Reset Email
                       </button>
                     </div>
                   </form>
                 </div>
 
-                <button onClick={handleLogout} className="btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--accent-danger)', padding: '12px', fontWeight: '800', fontSize: '13px' }}>
+                <button onClick={handleLogout} className="btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--accent-danger)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px', fontWeight: '800', fontSize: '13px' }}>
                   <LogOut size={16} /> Sign Out
                 </button>
               </div>
@@ -510,7 +583,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
               <form onSubmit={handleAuthSubmit}>
                 <input 
                   type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', marginBottom: '12px' }}
+                  style={{ width: '100%', padding: '12px', background: 'var(--modal-input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', marginBottom: '12px' }}
                 />
                 
                 <div style={{ position: 'relative', marginBottom: '8px' }}>
@@ -521,12 +594,12 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
                     onChange={e => setPassword(e.target.value)} 
                     required 
                     minLength={6}
-                    style={{ width: '100%', padding: '12px 40px 12px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                    style={{ width: '100%', padding: '12px 40px 12px 12px', background: 'var(--modal-input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
                   />
                   <button 
                     type="button" 
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -550,7 +623,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       {/* Mandatory Data Loss Recovery Lockscreen (PURE MANDATORY RESTORE, NO BYPASS) */}
       {mandatoryRestore && user && (
         <div style={{
-          position: 'fixed', inset: 0, background: '#0a0a0f',
+          position: 'fixed', inset: 0, background: 'var(--bg-base)', color: 'var(--text-primary)',
           zIndex: 20000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: '24px', textAlign: 'center'
         }}>
@@ -562,11 +635,11 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
             <ShieldAlert size={42} />
           </div>
 
-          <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'white', marginBottom: '10px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '10px' }}>
             Data Recovery Required
           </h2>
 
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', maxWidth: '340px', lineHeight: '1.5', marginBottom: '20px' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '340px', lineHeight: '1.5', marginBottom: '20px' }}>
             Your device storage was reset (0 records found), but your financial history is safely stored in your Cloud Account (<strong>{user.email}</strong>).
           </p>
 
@@ -574,7 +647,7 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
             <p style={{ fontSize: '12px', color: 'var(--accent-success)', fontWeight: '800' }}>
               🔒 Mandatory Protection
             </p>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               You must restore your records to access Money Map. This prevents losing your 2+ months of financial records.
             </p>
           </div>
@@ -598,15 +671,15 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
 
       {showSplash && (
         <div style={{
-          position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 10000,
+          position: 'fixed', inset: 0, background: 'var(--bg-base)', color: 'var(--text-primary)', zIndex: 10000,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           animation: 'fadeOut 0.5s ease 2s forwards'
         }}>
-          <div style={{ width: '120px', height: '120px', borderRadius: '30px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', marginBottom: '24px', animation: 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+          <div style={{ width: '120px', height: '120px', borderRadius: '30px', overflow: 'hidden', boxShadow: 'var(--card-shadow)', marginBottom: '24px', animation: 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
             <img src="/logo.png?v=1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Money Map" />
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '2px', color: 'white', opacity: 0, animation: 'fadeInUp 0.6s ease 0.4s forwards' }}>MONEY MAP</h1>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', opacity: 0, animation: 'fadeInUp 0.6s ease 0.6s forwards' }}>PREMIUM FINANCE MANAGER</p>
+          <h1 style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '2px', color: 'var(--text-primary)', opacity: 0, animation: 'fadeInUp 0.6s ease 0.4s forwards' }}>MONEY MAP</h1>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px', opacity: 0, animation: 'fadeInUp 0.6s ease 0.6s forwards' }}>PREMIUM FINANCE MANAGER</p>
         </div>
       )}
       <Routes>
@@ -626,10 +699,11 @@ function AppInner({ showExitConfirm, setShowExitConfirm, handleExit }) {
       {showExitConfirm && (
         <div style={{
           position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(30,30,36,0.97)', border: '1px solid rgba(255,255,255,0.1)',
+          background: 'var(--glass-bg)', border: '1px solid var(--border-color)',
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
           borderRadius: '16px', padding: '16px 24px', zIndex: 9999,
           display: 'flex', alignItems: 'center', gap: '16px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--card-shadow)',
           animation: 'slideUp 0.2s ease',
           whiteSpace: 'nowrap'
         }}>

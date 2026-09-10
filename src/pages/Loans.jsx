@@ -10,12 +10,12 @@ import AccountSelector from '../components/AccountSelector';
 const FormModal = ({ modal, setModal, person, setPerson, amount, setAmount, type, setType, accountId, setAccountId, note, setNote, accounts, setShowCalculator, setSelectorOpen, handleSave }) => (
   <div style={{
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    background: 'var(--overlay-bg)', backdropFilter: 'blur(8px)',
     zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
   }}>
-    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', background: 'var(--modal-bg)', color: 'var(--text-primary)', borderTop: '1px solid var(--border-color)', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, boxShadow: 'var(--card-shadow)' }}>
       <div className="flex-between" style={{ marginBottom: '20px' }}>
-        <h3 style={{ fontWeight: '800', fontSize: '18px' }}>{modal === 'add' ? 'New Loan Record' : 'Edit Loan'}</h3>
+        <h3 style={{ fontWeight: '800', fontSize: '18px', color: 'var(--text-primary)' }}>{modal === 'add' ? 'New Loan Record' : 'Edit Loan'}</h3>
         <button onClick={() => setModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
           <X size={22} />
         </button>
@@ -94,12 +94,12 @@ const FormModal = ({ modal, setModal, person, setPerson, amount, setAmount, type
 const PayModal = ({ payModal, setPayModal, payAmount, setPayAmount, payAccountId, setPayAccountId, remaining, accounts, setShowPayCalculator, setSelectorOpen, handleRecordPayment }) => (
   <div style={{
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    background: 'var(--overlay-bg)', backdropFilter: 'blur(8px)',
     zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
   }}>
-    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', background: 'var(--modal-bg)', color: 'var(--text-primary)', borderTop: '1px solid var(--border-color)', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, boxShadow: 'var(--card-shadow)' }}>
       <div className="flex-between" style={{ marginBottom: '8px' }}>
-        <h3 style={{ fontWeight: '800', fontSize: '18px' }}>Record Payment</h3>
+        <h3 style={{ fontWeight: '800', fontSize: '18px', color: 'var(--text-primary)' }}>Record Payment</h3>
         <button onClick={() => setPayModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
           <X size={22} />
         </button>
@@ -297,7 +297,7 @@ export default function Loans() {
 
                   {/* Progress bar */}
                   {loan.status === 'partial' && (
-                    <div style={{ marginTop: '12px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ marginTop: '12px', height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${pctPaid}%`, background: 'var(--accent-success)', borderRadius: '2px', transition: 'width 0.4s' }} />
                     </div>
                   )}
@@ -328,10 +328,10 @@ export default function Loans() {
 
                 {/* History */}
                 {isExpanded && (loan.payments || []).length > 0 && (
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '12px 16px', background: 'var(--bg-glass-subtle)' }}>
                     <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Payment History</p>
                     {loan.payments.map((p, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < loan.payments.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < loan.payments.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button 
                             onClick={() => { if(window.confirm('Delete this payment? Balance will be reversed.')) deleteLoanPayment(loan.id, i); }} 

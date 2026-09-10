@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
-import { ChevronLeft, Plus, Trash2, Edit2, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Check, X, Download, Upload, RefreshCw, CloudUpload } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Edit2, Pizza, Zap, Car, Briefcase, ShoppingBag, Coffee, Home, Heart, MoreHorizontal, Check, X, Download, Upload, RefreshCw, CloudUpload, ChevronDown, ChevronUp } from 'lucide-react';
 
 const ICONS = [
   { id: 'pizza', icon: Pizza },
@@ -29,6 +29,9 @@ export default function CategoryManager() {
   const importData = useStore(state => state.importData);
   const [showManualImport, setShowManualImport] = useState(false);
   const [manualJSON, setManualJSON] = useState('');
+
+  const [showExpenseList, setShowExpenseList] = useState(true);
+  const [showIncomeList, setShowIncomeList] = useState(true);
 
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -104,7 +107,7 @@ export default function CategoryManager() {
                 <button 
                   key={t}
                   className="btn" 
-                  style={{ flex: 1, background: type === t ? 'var(--accent-primary)' : 'var(--bg-surface)', textTransform: 'capitalize' }}
+                  style={{ flex: 1, background: type === t ? 'var(--accent-primary)' : 'var(--bg-surface)', color: type === t ? 'white' : 'var(--text-primary)', textTransform: 'capitalize' }}
                   onClick={() => setType(t)}
                 >
                   {t}
@@ -123,7 +126,8 @@ export default function CategoryManager() {
                   style={{
                     padding: '12px', borderRadius: '12px',
                     background: selectedIcon === id ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    border: 'none', color: selectedIcon === id ? 'white' : 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer'
                   }}
                 >
                   <Icon size={20} />
@@ -156,35 +160,125 @@ export default function CategoryManager() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {categories.map(cat => {
-          const IconComp = ICONS.find(i => i.id === cat.icon)?.icon || MoreHorizontal;
-          return (
-            <div key={cat.id} className="glass-panel" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: `4px solid ${cat.color}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ 
-                  width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: cat.color
-                }}>
-                  <IconComp size={24} />
+      {/* Collapsible Expense Categories Accordion */}
+      {(() => {
+        const expenseCats = categories.filter(c => c.type === 'expense');
+        const incomeCats = categories.filter(c => c.type === 'income');
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Expense Categories Header */}
+            <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+              <button
+                onClick={() => setShowExpenseList(!showExpenseList)}
+                style={{
+                  width: '100%', padding: '16px', background: 'transparent', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  color: 'var(--text-primary)', cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '800' }}>Expense Categories</span>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--accent-danger)', fontWeight: '700' }}>
+                    {expenseCats.length}
+                  </span>
                 </div>
-                <div>
-                  <h4 style={{ fontWeight: '700' }}>{cat.name}</h4>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>{cat.type}</p>
+                {showExpenseList ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
+              </button>
+
+              {showExpenseList && (
+                <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {expenseCats.map(cat => {
+                    const IconComp = ICONS.find(i => i.id === cat.icon)?.icon || MoreHorizontal;
+                    return (
+                      <div key={cat.id} style={{
+                        padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-glass-subtle)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        borderLeft: `4px solid ${cat.color}`, border: '1px solid var(--border-subtle)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{ 
+                            width: '38px', height: '38px', borderRadius: '10px', background: 'var(--bg-surface)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: cat.color
+                          }}>
+                            <IconComp size={20} />
+                          </div>
+                          <div>
+                            <h4 style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{cat.name}</h4>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button onClick={() => handleEdit(cat)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', padding: '6px', cursor: 'pointer' }}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => { if(window.confirm('Delete this category?')) deleteCategory(cat.id) }} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', padding: '6px', cursor: 'pointer' }}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => handleEdit(cat)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', padding: '8px' }}>
-                  <Edit2 size={18} />
-                </button>
-                <button onClick={() => { if(window.confirm('Delete this category?')) deleteCategory(cat.id) }} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', padding: '8px' }}>
-                  <Trash2 size={18} />
-                </button>
-              </div>
+              )}
             </div>
-          );
-        })}
-      </div>
+
+            {/* Income Categories Header */}
+            <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+              <button
+                onClick={() => setShowIncomeList(!showIncomeList)}
+                style={{
+                  width: '100%', padding: '16px', background: 'transparent', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  color: 'var(--text-primary)', cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '800' }}>Income Categories</span>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-success)', fontWeight: '700' }}>
+                    {incomeCats.length}
+                  </span>
+                </div>
+                {showIncomeList ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
+              </button>
+
+              {showIncomeList && (
+                <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {incomeCats.map(cat => {
+                    const IconComp = ICONS.find(i => i.id === cat.icon)?.icon || MoreHorizontal;
+                    return (
+                      <div key={cat.id} style={{
+                        padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-glass-subtle)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        borderLeft: `4px solid ${cat.color}`, border: '1px solid var(--border-subtle)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{ 
+                            width: '38px', height: '38px', borderRadius: '10px', background: 'var(--bg-surface)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: cat.color
+                          }}>
+                            <IconComp size={20} />
+                          </div>
+                          <div>
+                            <h4 style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{cat.name}</h4>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button onClick={() => handleEdit(cat)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', padding: '6px', cursor: 'pointer' }}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => { if(window.confirm('Delete this category?')) deleteCategory(cat.id) }} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', padding: '6px', cursor: 'pointer' }}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="glass-panel" style={{ padding: '24px', marginTop: '32px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Data Management</h3>

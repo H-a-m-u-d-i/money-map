@@ -7,12 +7,12 @@ import AccountSelector from '../components/AccountSelector';
 const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, startDate, setStartDate, note, setNote, accountId, setAccountId, accounts, setSelectorOpen, handleAdd, onClose }) => (
   <div style={{
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    background: 'var(--overlay-bg)', backdropFilter: 'blur(8px)',
     zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
   }}>
-    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+    <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px 24px', background: 'var(--modal-bg)', color: 'var(--text-primary)', borderTop: '1px solid var(--border-color)', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, boxShadow: 'var(--card-shadow)' }}>
       <div className="flex-between" style={{ marginBottom: '20px' }}>
-        <h3 style={{ fontWeight: '800', fontSize: '18px' }}>New Recurring</h3>
+        <h3 style={{ fontWeight: '800', fontSize: '18px', color: 'var(--text-primary)' }}>New Recurring</h3>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)' }}><X size={22} /></button>
       </div>
 
@@ -23,7 +23,7 @@ const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, 
             <button
               key={t}
               className="btn"
-              style={{ flex: 1, background: type === t ? 'var(--accent-primary)' : 'var(--bg-surface)', fontWeight: '700' }}
+              style={{ flex: 1, background: type === t ? 'var(--accent-primary)' : 'var(--bg-surface)', color: type === t ? 'white' : 'var(--text-primary)', fontWeight: '700' }}
               onClick={() => setType(t)}
             >
               {t.toUpperCase()}
@@ -39,7 +39,7 @@ const FormModal = ({ type, setType, amount, setAmount, frequency, setFrequency, 
             <button
               key={f}
               className="btn"
-              style={{ flex: 1, background: frequency === f ? 'var(--accent-primary)' : 'var(--bg-surface)', fontSize: '12px', fontWeight: '700' }}
+              style={{ flex: 1, background: frequency === f ? 'var(--accent-primary)' : 'var(--bg-surface)', color: frequency === f ? 'white' : 'var(--text-primary)', fontSize: '12px', fontWeight: '700' }}
               onClick={() => setFrequency(f)}
             >
               {f.toUpperCase()}

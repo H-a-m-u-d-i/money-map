@@ -205,7 +205,7 @@ export default function NewTransaction() {
               <div className="glass-panel" style={{ 
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, 
                 maxHeight: '150px', overflowY: 'auto', marginTop: '4px',
-                padding: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+                padding: '8px', boxShadow: 'var(--card-shadow)'
               }}>
                 {[...new Set(transactions.map(t => t.note))]
                   .filter(n => n.toLowerCase().includes(note.toLowerCase()) && n.toLowerCase() !== note.toLowerCase())
@@ -215,7 +215,7 @@ export default function NewTransaction() {
                       key={idx}
                       onClick={() => { setNote(suggestion); setShowSuggestions(false); }}
                       style={{ 
-                        padding: '10px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        padding: '10px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)',
                         fontSize: '14px', color: 'var(--text-secondary)'
                       }}
                     >
@@ -238,7 +238,7 @@ export default function NewTransaction() {
               value={customDate}
               onChange={e => setCustomDate(e.target.value)}
               max={new Date().toISOString().split('T')[0]} // Cannot pick future dates for standard transactions
-              style={{ textAlign: 'center', fontSize: '16px', colorScheme: 'dark' }}
+              style={{ textAlign: 'center', fontSize: '16px' }}
             />
           </div>
 

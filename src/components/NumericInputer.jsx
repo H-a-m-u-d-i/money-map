@@ -43,23 +43,25 @@ export default function NumericInputer({ value, onChange, onDone }) {
 
   return (
     <div style={{
-      background: 'var(--bg-surface-elevated)',
+      background: 'var(--modal-bg)',
+      color: 'var(--text-primary)',
       padding: '20px',
       borderTopLeftRadius: '24px',
       borderTopRightRadius: '24px',
+      borderTop: '1px solid var(--border-color)',
       position: 'fixed',
       bottom: 0,
       left: 0,
       right: 0,
       zIndex: 2000,
-      boxShadow: '0 -10px 40px rgba(0,0,0,0.4)',
+      boxShadow: 'var(--card-shadow)',
       animation: 'slideUp 0.3s ease-out'
     }}>
       <div className="flex-between" style={{ marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+        <h3 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--accent-primary)' }}>
           {expression || '0'}
         </h3>
-        <button onClick={handleBackspace} className="btn" style={{ padding: '8px', background: 'transparent' }}>
+        <button onClick={handleBackspace} className="btn" style={{ padding: '8px', background: 'transparent', color: 'var(--text-primary)' }}>
           <Delete size={20} />
         </button>
       </div>
@@ -76,9 +78,9 @@ export default function NumericInputer({ value, onChange, onDone }) {
             style={{
               padding: '16px 0',
               borderRadius: '12px',
-              border: 'none',
-              background: isNaN(key) && key !== '.' && key !== 'C' ? 'var(--bg-surface)' : 'rgba(255,255,255,0.05)',
-              color: isNaN(key) && key !== '.' && key !== 'C' ? 'var(--accent-primary)' : 'white',
+              border: '1px solid var(--border-color)',
+              background: isNaN(key) && key !== '.' && key !== 'C' ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+              color: isNaN(key) && key !== '.' && key !== 'C' ? 'var(--accent-primary)' : 'var(--text-primary)',
               fontSize: '20px',
               fontWeight: '700',
               cursor: 'pointer'
@@ -94,8 +96,8 @@ export default function NumericInputer({ value, onChange, onDone }) {
             gridColumn: 'span 2',
             padding: '16px 0',
             borderRadius: '12px',
-            border: 'none',
-            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-surface-elevated)',
             color: 'var(--accent-success)',
             fontSize: '18px',
             fontWeight: '700'

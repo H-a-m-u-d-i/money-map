@@ -110,11 +110,11 @@ export default function SavingsSimulator() {
         </p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={chartData.filter((_, i) => i % 3 === 2)}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
             <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} />
             <YAxis tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
             <Tooltip
-              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
+              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-primary)' }}
               formatter={v => `$${v.toLocaleString()}`}
             />
             <Legend wrapperStyle={{ fontSize: '11px' }} />

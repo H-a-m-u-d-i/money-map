@@ -283,9 +283,9 @@ export default function Dashboard() {
           onClick={() => setShowTimeframeSelector(true)}
           style={{ 
             display: 'flex', alignItems: 'center', gap: '8px', 
-            background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '16px', 
-            border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            background: 'var(--bg-surface-elevated)', padding: '8px 16px', borderRadius: '16px', 
+            border: '1px solid var(--border-color)', cursor: 'pointer',
+            boxShadow: 'var(--card-shadow)',
             transition: 'all 0.2s'
           }}
         >
@@ -307,9 +307,9 @@ export default function Dashboard() {
       <div className="glass-panel" style={{ 
         padding: '20px', 
         marginBottom: '20px',
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(42, 42, 53, 0.95) 100%)',
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, var(--bg-surface) 100%)',
         borderLeft: '4px solid var(--accent-success)',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+        boxShadow: 'var(--card-shadow)'
       }}>
         <div className="flex-between" style={{ alignItems: 'flex-start' }}>
           <div>
@@ -350,8 +350,8 @@ export default function Dashboard() {
           <button 
             onClick={() => setShowAccounts(!showAccounts)}
             style={{ 
-              width: '100%', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px',
-              border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
+              width: '100%', background: 'var(--bg-glass-subtle)', padding: '12px', borderRadius: '12px',
+              border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
             }}
           >
             <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
@@ -361,7 +361,7 @@ export default function Dashboard() {
           </button>
           
           {showAccounts && (
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', marginTop: '4px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '8px', animation: 'slideIn 0.3s ease' }}>
+            <div style={{ padding: '12px', background: 'var(--bg-glass-subtle)', border: '1px solid var(--border-subtle)', marginTop: '4px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '8px', animation: 'slideIn 0.3s ease' }}>
               {accounts.filter(acc => acc.type !== 'cash').map(acc => (
                 <div key={acc.id} className="flex-between" style={{ fontSize: '13px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
@@ -437,11 +437,11 @@ export default function Dashboard() {
             <button onClick={() => setPaydayDay(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', opacity: 0.5, cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>×</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px' }}>
+            <div style={{ background: 'var(--bg-glass-subtle)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '10px' }}>
               <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Safe Daily Spend</p>
               <p style={{ fontSize: '16px', fontWeight: '800', color: '#f59e0b' }}>${paydayInfo.safeDailySpend.toFixed(0)}/day</p>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px' }}>
+            <div style={{ background: 'var(--bg-glass-subtle)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '10px' }}>
               <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Daily Burn Rate</p>
               <p style={{ fontSize: '16px', fontWeight: '800', color: paydayInfo.dailyBurnRate > paydayInfo.safeDailySpend ? '#ef4444' : '#10b981' }}>
                 ${paydayInfo.dailyBurnRate.toFixed(0)}/day
@@ -537,7 +537,8 @@ export default function Dashboard() {
                   >
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                       <div style={{ 
-                        width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)',
+                        width: '44px', height: '44px', borderRadius: '12px', background: 'var(--bg-glass-subtle)',
+                        border: '1px solid var(--border-subtle)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', color: group.color
                       }}>
                         <Icon size={24} />
@@ -556,7 +557,7 @@ export default function Dashboard() {
                   </div>
 
                   {isExpanded && (
-                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 20px 20px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ background: 'var(--bg-glass-subtle)', padding: '10px 20px 20px 20px', borderTop: '1px solid var(--border-subtle)' }}>
                       <div style={{ position: 'relative', paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{ position: 'absolute', left: '7px', top: '0', bottom: '10px', width: '2px', background: group.color, opacity: 0.3 }} />
                         {group.transactions.map(txn => (
@@ -650,7 +651,7 @@ export default function Dashboard() {
       {showTimeframeSelector && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+          background: 'var(--overlay-bg)', backdropFilter: 'blur(10px)',
           zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
         }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '24px' }}>
@@ -666,9 +667,9 @@ export default function Dashboard() {
                   }}
                   style={{
                     padding: '16px', borderRadius: '16px', border: 'none',
-                    background: displayMode === mode ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                    background: displayMode === mode ? 'var(--accent-primary)' : 'var(--bg-surface-elevated)',
                     color: displayMode === mode ? 'white' : 'var(--text-secondary)',
-                    fontWeight: '700', textTransform: 'capitalize', transition: 'all 0.2s'
+                    fontWeight: '700', textTransform: 'capitalize', transition: 'all 0.2s', cursor: 'pointer'
                   }}
                 >
                   {mode === 'all' ? 'Total' : mode}

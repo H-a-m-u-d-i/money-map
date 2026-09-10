@@ -6,8 +6,8 @@ export default function AccountSelector({ accounts, selectedId, onSelect, onClos
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.85)',
-      backdropFilter: 'blur(10px)',
+      background: 'var(--overlay-bg)',
+      backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'flex-end',
       zIndex: 2000,
@@ -15,15 +15,18 @@ export default function AccountSelector({ accounts, selectedId, onSelect, onClos
     }}>
       <div style={{
         width: '100%',
-        background: 'var(--bg-surface)',
+        background: 'var(--modal-bg)',
+        color: 'var(--text-primary)',
         borderTopLeftRadius: '24px',
         borderTopRightRadius: '24px',
+        borderTop: '1px solid var(--border-color)',
         padding: '24px 20px 40px 20px',
+        boxShadow: 'var(--card-shadow)',
         animation: 'slideUp 0.3s ease-out'
       }}>
         <div className="flex-between" style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '800' }}>{label || 'Select Account'}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>{label || 'Select Account'}</h3>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <X size={24} />
           </button>
         </div>
@@ -41,8 +44,8 @@ export default function AccountSelector({ accounts, selectedId, onSelect, onClos
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.02)',
-                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.05)',
+                  background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-glass-subtle)',
+                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                   textAlign: 'left',
                   width: '100%',
                   cursor: 'pointer',

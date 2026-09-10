@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+/* Default Theme Tokens (Dark Mode) */
 :root {
-  /* Premium Dark Mode Colors */
   --bg-base: #121214;
   --bg-surface: #1e1e24;
   --bg-surface-elevated: #2a2a35;
@@ -17,12 +17,55 @@
   --accent-transfer: #8b5cf6; /* Purple for transfers */
 
   --border-color: #3f3f46;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --glass-bg: rgba(30, 30, 36, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --bg-glass-subtle: rgba(255, 255, 255, 0.03);
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  --nav-bg: rgba(30, 30, 36, 0.85);
+  --header-bg: rgba(10, 10, 15, 0.65);
+  --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --modal-bg: #181820;
+  --modal-input-bg: rgba(255, 255, 255, 0.05);
   
   --radius-sm: 8px;
   --radius-md: 16px;
   --radius-lg: 24px;
   
   --shadow-glow: 0 0 20px var(--accent-primary-glow);
+}
+
+/* Light Theme Tokens — Ocean Teal */
+[data-theme="light"] {
+  --bg-base: #c8d8d8;
+  --bg-surface: #d0dede;
+  --bg-surface-elevated: #bacccc;
+
+  --text-primary: #0f2028;
+  --text-secondary: #3d5c60;
+
+  --accent-primary: #0e7c7b;           /* deep teal */
+  --accent-primary-glow: rgba(14, 124, 123, 0.22);
+  --accent-success: #1a7a4a;           /* muted green */
+  --accent-danger: #a03030;            /* muted crimson */
+  --accent-warning: #8a6010;           /* muted amber */
+  --accent-transfer: #3d6ea8;          /* ocean blue */
+
+  --border-color: #92b4b4;
+  --border-subtle: rgba(0, 60, 60, 0.12);
+  --glass-bg: rgba(180, 210, 210, 0.78);
+  --glass-border: rgba(0, 80, 80, 0.15);
+  --bg-glass-subtle: rgba(0, 60, 60, 0.06);
+  --overlay-bg: rgba(0, 20, 30, 0.55);
+
+  --nav-bg: rgba(185, 215, 215, 0.94);
+  --header-bg: rgba(175, 205, 205, 0.92);
+  --card-shadow: 0 4px 18px rgba(0, 60, 60, 0.12), 0 2px 6px rgba(0, 40, 40, 0.07);
+  --modal-bg: #c8d8d8;
+  --modal-input-bg: #bacccc;
+
+  --shadow-glow: 0 4px 14px var(--accent-primary-glow);
 }
 
 * {
@@ -37,22 +80,24 @@ body {
   background-color: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.5;
-  /* Prevent overscroll glow on Android/iOS */
+  transition: background-color 0.3s ease, color 0.3s ease;
   overscroll-behavior-y: none; 
 }
 
 /* Glassmorphism Utilities */
 .glass-panel {
-  background: rgba(30, 30, 36, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--card-shadow);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Common Layouts */
 .app-container {
-  max-width: 600px; /* Mobile first, constrained width on desktop */
+  max-width: 600px;
   margin: 0 auto;
   min-height: 100vh;
   display: flex;
@@ -62,13 +107,14 @@ body {
 .page {
   flex: 1;
   padding: 24px 16px;
-  padding-bottom: 80px; /* Space for bottom nav */
+  padding-bottom: 90px;
 }
 
 .title {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 8px;
+  color: var(--text-primary);
 }
 
 .subtitle {
@@ -98,10 +144,10 @@ body {
 .btn {
   background: var(--bg-surface-elevated);
   color: var(--text-primary);
-  border: none;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 12px 24px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -117,6 +163,8 @@ body {
 
 .btn-primary {
   background: var(--accent-primary);
+  color: #ffffff;
+  border: none;
   box-shadow: var(--shadow-glow);
 }
 
@@ -131,7 +179,7 @@ body {
 .input-label {
   font-size: 14px;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .input-field {
@@ -142,7 +190,7 @@ body {
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   font-size: 16px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.3s ease, color 0.3s ease;
 }
 
 .input-field:focus {
